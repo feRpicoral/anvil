@@ -34,8 +34,17 @@ def test_early_stop_min_delta_respects_tolerance() -> None:
     policy = EarlyStoppingPolicy(patience=1, min_delta=0.05)
 
     policy.update(1.0)
-    # 0.96 is an improvement (drop of 0.04) but smaller than min_delta.
     assert policy.update(0.96) is True
+
+
+def test_early_stop_min_delta_treats_exact_delta_as_improvement() -> None:
+    policy = EarlyStoppingPolicy(patience=1, min_delta=0.05)
+
+    policy.update(1.0)
+
+    assert policy.update(0.95) is False
+    assert policy.bad_steps == 0
+    assert policy.best_loss == 0.95
 
 
 def test_early_stop_recovers_after_intermittent_plateau() -> None:
@@ -82,19 +91,29 @@ def test_checkpoint_rotation_keeps_only_recent_when_no_best() -> None:
     assert rotation.record(100) == []
     assert rotation.record(200) == []
     assert rotation.record(300) == [100]
-    assert rotation.record(400) == [100, 200]
+    assert rotation.record(400) == [200]
+
+
+def test_checkpoint_rotation_returns_each_delete_once() -> None:
+    rotation = CheckpointRotation(keep_n=1, keep_best=False)
+
+    assert rotation.record(100) == []
+    assert rotation.record(200) == [100]
+    assert rotation.record(300) == [200]
 
 
 def test_checkpoint_rotation_pins_best_outside_recent_window() -> None:
     rotation = CheckpointRotation(keep_n=2, keep_best=True)
 
     rotation.record(100, val_loss=2.0)
-    rotation.record(200, val_loss=0.5)  # best
-    rotation.record(300, val_loss=1.0)
+    rotation.record(200, val_loss=0.5)
+    delete_at_300 = rotation.record(300, val_loss=1.0)
     delete_at_400 = rotation.record(400, val_loss=1.5)
 
+    assert 100 in delete_at_300
+    assert 200 not in delete_at_300
     assert 200 not in delete_at_400
-    assert 100 in delete_at_400
+    assert 100 not in delete_at_400
 
 
 def test_checkpoint_rotation_updates_best_when_lower_loss_seen() -> None:
@@ -142,6 +161,8 @@ def test_checkpoint_rotation_rejects_non_finite_loss() -> None:
 def test_wandb_config_rejects_empty_project() -> None:
     with pytest.raises(ValueError, match="project"):
         WandbConfig(project="")
+    with pytest.raises(ValueError, match="project"):
+        WandbConfig(project="   ")
 
 
 def test_wandb_init_kwargs_minimal() -> None:

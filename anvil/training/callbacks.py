@@ -28,8 +28,8 @@ class EarlyStoppingPolicy:
 
     patience: int = 2
     min_delta: float = 0.0
-    best_loss: float = math.inf
-    bad_steps: int = 0
+    best_loss: float = field(default=math.inf, init=False)
+    bad_steps: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         if self.patience < 1:
@@ -41,7 +41,7 @@ class EarlyStoppingPolicy:
         """Record `val_loss` and return True if training should stop."""
         if not math.isfinite(val_loss):
             raise ValueError("val_loss must be finite")
-        if val_loss < self.best_loss - self.min_delta:
+        if val_loss <= self.best_loss - self.min_delta:
             self.best_loss = val_loss
             self.bad_steps = 0
         else:
@@ -65,9 +65,10 @@ class CheckpointRotation:
 
     keep_n: int = 2
     keep_best: bool = True
-    best_step: int | None = None
-    best_loss: float = math.inf
-    history: list[int] = field(default_factory=list)
+    best_step: int | None = field(default=None, init=False)
+    best_loss: float = field(default=math.inf, init=False)
+    history: list[int] = field(default_factory=list, init=False)
+    deleted_steps: set[int] = field(default_factory=set, init=False)
 
     def __post_init__(self) -> None:
         if self.keep_n < 1:
@@ -93,7 +94,11 @@ class CheckpointRotation:
         to_keep: set[int] = set(recent)
         if self.keep_best and self.best_step is not None:
             to_keep.add(self.best_step)
-        return [step for step in self.history if step not in to_keep]
+        to_delete = [
+            step for step in self.history if step not in to_keep and step not in self.deleted_steps
+        ]
+        self.deleted_steps.update(to_delete)
+        return to_delete
 
 
 @dataclass(frozen=True)
@@ -106,7 +111,7 @@ class WandbConfig:
     tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        if not self.project:
+        if not self.project.strip():
             raise ValueError("project must be non-empty")
 
 

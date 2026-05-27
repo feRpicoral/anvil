@@ -1,0 +1,33 @@
+# Training smoke: TRL + Qwen 2.5 0.5B + 1 epoch on the smoke dataset.
+#
+# Validates the wiring (config + data + chat-template + adapter save/load)
+# without QLoRA-specific numerics. The smoke runs on M1 in BF16 LoRA;
+# the paid run swaps in Unsloth + Llama 3.1 8B + NF4 in `train-full.toml`.
+#
+# Requires `data/smoke/train.jsonl` and `data/smoke/val.jsonl` from
+# `make data-smoke`.
+base_model = "Qwen/Qwen2.5-0.5B-Instruct"
+backend = "trl"
+output_dir = "outputs/smoke"
+train_jsonl = "data/smoke/train.jsonl"
+val_jsonl = "data/smoke/val.jsonl"
+
+rank = 8
+alpha = 16
+lora_dropout = 0.05
+target_modules = "qkv"
+quantization = "bf16"
+
+learning_rate = 5.0e-5
+epochs = 1
+batch_size = 1
+grad_accum = 4
+warmup_ratio = 0.05
+weight_decay = 0.0
+max_seq_len = 1024
+seed = 0
+
+eval_strategy = "epoch"
+save_strategy = "epoch"
+save_total_limit = 1
+keep_best_only = true

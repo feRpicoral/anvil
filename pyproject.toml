@@ -94,6 +94,7 @@ module = [
     "datasets.*",
     "bitsandbytes.*",
     "torch.*",
+    "unsloth.*",
 ]
 ignore_missing_imports = true
 

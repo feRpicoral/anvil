@@ -54,13 +54,13 @@ def _print_summary(config: TrainingConfig, *, file: TextIO) -> None:
 
 def _run_training(config: TrainingConfig, resume_from: Path | None) -> int:
     if config.backend == "trl":
-        from anvil.training.trl_trainer import train
+        from anvil.training.trl_trainer import train as trl_train
 
-        return train(config, resume_from)
+        return trl_train(config, resume_from)
     if config.backend == "unsloth":
-        raise NotImplementedError(
-            "Unsloth backend lands in a follow-up PR; use backend='trl' for the M1 smoke."
-        )
+        from anvil.training.unsloth_trainer import train as unsloth_train
+
+        return unsloth_train(config, resume_from)
     raise ValueError(f"unsupported backend: {config.backend!r}")
 
 

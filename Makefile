@@ -1,4 +1,4 @@
-.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke
+.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full
 
 PYTHON := uv run python
 DATA_SMOKE_DIR := data/smoke
@@ -18,6 +18,7 @@ help:
 	@echo "  data-smoke   50-sample fixture-replay dataset; zero API spend"
 	@echo "  data-full    4000-sample paid dataset (requires CONFIRM_PAID=1 and OPENAI_API_KEY)"
 	@echo "  train-smoke  generate smoke data and run TRL smoke training"
+	@echo "  train-full   paid Unsloth + Llama 3.1 8B QLoRA run (requires CONFIRM_PAID=1, HF_TOKEN, GPU)"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -58,6 +59,13 @@ endif
 
 train-smoke: data-smoke
 	$(PYTHON) -m scripts.train --config configs/train-smoke.toml
+
+train-full:
+ifneq ($(CONFIRM_PAID),1)
+	@echo "train-full is a paid run. Re-invoke with CONFIRM_PAID=1 to proceed."
+	@exit 1
+endif
+	$(PYTHON) -m scripts.train --config configs/train-full.toml
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

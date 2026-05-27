@@ -27,7 +27,7 @@ dev = [
 # The training stack (torch, bitsandbytes, peft, trl, unsloth/axolotl) has CUDA
 # transitives that don't resolve cleanly across darwin/arm64 and linux/x86_64 in
 # a single lock. Install it explicitly per platform using the canonical
-# constraint files (populated in Phase 2):
+# constraint files:
 #   uv pip install -c constraints/train.txt <framework>
 #   uv pip install -c constraints/eval.txt openai
 # This mirrors Forge's vLLM-out-of-band pattern for the same lock-stability

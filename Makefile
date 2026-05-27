@@ -16,7 +16,7 @@ help:
 	@echo "  clean        Remove caches and build artefacts"
 	@echo ""
 	@echo "Domain targets (data, train, eval, cost, chart, publish, rehearse)"
-	@echo "are added as Phases 3–9 land. See DECISIONS.md."
+	@echo "are added as the relevant modules land."
 
 install:
 	uv sync --all-extras --all-groups

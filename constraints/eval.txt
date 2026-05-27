@@ -1,4 +1,4 @@
-# Eval-time constraints — populated in Phase 5.
+# Eval-time constraints.
 #
 # Minimal set: OpenAI / Anthropic clients for the big-model baseline + LLM-
 # as-judge, plus a structured-output validator for JSON-validity scoring.

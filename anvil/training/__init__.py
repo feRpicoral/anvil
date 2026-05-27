@@ -1,1 +1,1 @@
-"""QLoRA training pipeline with W&B tracking (Phase 4)."""
+"""QLoRA training pipeline with W&B tracking."""

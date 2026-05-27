@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from anvil.training.qlora import TrainingConfig, lora_target_module_names
-from anvil.training.trl_trainer import build_sft_kwargs, load_messages_jsonl
+from anvil.training.trl_trainer import apply_wandb_env, build_sft_kwargs, load_messages_jsonl
 
 _INSTALL_HINT = (
     "Unsloth training stack not installed. Run:\n"
@@ -29,12 +29,16 @@ _INSTALL_HINT = (
 
 def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
     """Run Unsloth + TRL SFT end-to-end and save the LoRA adapter."""
+    build_unsloth_load_kwargs(config)
     try:
+        import unsloth  # noqa: F401
+
+        if config.quantization in {"nf4", "int8"}:
+            import bitsandbytes  # noqa: F401
         import datasets  # noqa: F401
         import torch  # noqa: F401
         import transformers  # noqa: F401
         import trl  # noqa: F401
-        import unsloth  # noqa: F401
     except ImportError as exc:
         raise ImportError(_INSTALL_HINT) from exc
 
@@ -43,7 +47,9 @@ def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
 
 def build_unsloth_load_kwargs(config: TrainingConfig) -> dict[str, Any]:
     """Materialize the kwargs for `FastLanguageModel.from_pretrained`."""
-    load_in_4bit = config.quantization in {"nf4", "fp4"}
+    if config.quantization == "fp4":
+        raise ValueError("Unsloth backend does not support fp4; use nf4, int8, or bf16")
+    load_in_4bit = config.quantization == "nf4"
     return {
         "model_name": config.base_model,
         "max_seq_length": config.max_seq_len,
@@ -82,6 +88,7 @@ def _train_impl(config: TrainingConfig, resume_from: Path | None) -> int:
     train_dataset = Dataset.from_list(train_records)
     val_dataset = Dataset.from_list(val_records) if val_records is not None else None
 
+    apply_wandb_env(config)
     sft_config = SFTConfig(**build_sft_kwargs(config))
     trainer = SFTTrainer(
         model=model,

@@ -17,6 +17,7 @@ from anvil.training.qlora import TrainingConfig
 from anvil.training.trl_trainer import (
     build_lora_kwargs,
     build_sft_kwargs,
+    build_wandb_env,
     load_messages_jsonl,
 )
 
@@ -181,6 +182,32 @@ def test_build_sft_kwargs_carries_steps_when_strategy_is_steps() -> None:
     assert kwargs["save_steps"] == 100
 
 
+def test_build_sft_kwargs_loads_best_model_when_requested() -> None:
+    kwargs = build_sft_kwargs(_config(val_jsonl=Path("data/smoke/val.jsonl")))
+
+    assert kwargs["load_best_model_at_end"] is True
+    assert kwargs["metric_for_best_model"] == "eval_loss"
+    assert kwargs["greater_is_better"] is False
+
+
+def test_build_sft_kwargs_skips_best_model_without_eval() -> None:
+    kwargs = build_sft_kwargs(_config(val_jsonl=None, keep_best_only=True))
+
+    assert "load_best_model_at_end" not in kwargs
+
+
+def test_build_sft_kwargs_rejects_best_model_strategy_mismatch() -> None:
+    config = _config(
+        val_jsonl=Path("data/smoke/val.jsonl"),
+        eval_strategy="epoch",
+        save_strategy="steps",
+        save_steps=100,
+    )
+
+    with pytest.raises(ValueError, match="save_strategy"):
+        build_sft_kwargs(config)
+
+
 def test_build_sft_kwargs_omits_eval_steps_when_eval_disabled_without_val() -> None:
     kwargs = build_sft_kwargs(_config(eval_strategy="steps", eval_steps=50, val_jsonl=None))
 
@@ -196,12 +223,19 @@ def test_build_sft_kwargs_omits_eval_steps_when_strategy_is_not_steps() -> None:
 
 
 def test_build_sft_kwargs_reports_wandb_when_project_set() -> None:
-    kwargs = build_sft_kwargs(_config(wandb_project="anvil"))
+    kwargs = build_sft_kwargs(_config(wandb_project="anvil", wandb_run_name="smoke"))
 
     assert kwargs["report_to"] == ["wandb"]
+    assert kwargs["run_name"] == "smoke"
 
 
 def test_build_sft_kwargs_disables_wandb_when_unset() -> None:
     kwargs = build_sft_kwargs(_config())
 
     assert kwargs["report_to"] == []
+
+
+def test_build_wandb_env_maps_project_and_entity() -> None:
+    env = build_wandb_env(_config(wandb_project="anvil", wandb_entity="feRpicoral"))
+
+    assert env == {"WANDB_PROJECT": "anvil", "WANDB_ENTITY": "feRpicoral"}

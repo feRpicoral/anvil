@@ -18,6 +18,7 @@ Install the stack with:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -111,11 +112,33 @@ def build_sft_kwargs(config: TrainingConfig) -> dict[str, Any]:
         "logging_strategy": "steps",
         "report_to": ["wandb"] if config.wandb_project else [],
     }
+    if config.wandb_run_name:
+        kwargs["run_name"] = config.wandb_run_name
     if eval_strategy == "steps" and config.eval_steps is not None:
         kwargs["eval_steps"] = config.eval_steps
     if config.save_strategy == "steps" and config.save_steps is not None:
         kwargs["save_steps"] = config.save_steps
+    if config.keep_best_only and eval_strategy != "no":
+        if config.save_strategy != eval_strategy:
+            raise ValueError("save_strategy must match eval_strategy when keep_best_only=True")
+        kwargs["load_best_model_at_end"] = True
+        kwargs["metric_for_best_model"] = "eval_loss"
+        kwargs["greater_is_better"] = False
     return kwargs
+
+
+def build_wandb_env(config: TrainingConfig) -> dict[str, str]:
+    """Materialize W&B environment variables from training config."""
+    env: dict[str, str] = {}
+    if config.wandb_project:
+        env["WANDB_PROJECT"] = config.wandb_project
+    if config.wandb_entity:
+        env["WANDB_ENTITY"] = config.wandb_entity
+    return env
+
+
+def apply_wandb_env(config: TrainingConfig) -> None:
+    os.environ.update(build_wandb_env(config))
 
 
 def build_model_kwargs(config: TrainingConfig) -> dict[str, Any]:
@@ -170,6 +193,7 @@ def _train_impl(config: TrainingConfig, resume_from: Path | None) -> int:
 
     model = AutoModelForCausalLM.from_pretrained(config.base_model, **build_model_kwargs(config))
 
+    apply_wandb_env(config)
     sft_config = SFTConfig(**build_sft_kwargs(config))
     lora_config = LoraConfig(**build_lora_kwargs(config))
 

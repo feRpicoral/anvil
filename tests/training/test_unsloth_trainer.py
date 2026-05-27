@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from anvil.training.qlora import TrainingConfig
 from anvil.training.unsloth_trainer import (
     build_unsloth_load_kwargs,
@@ -32,11 +34,9 @@ def test_load_kwargs_for_nf4_uses_4bit() -> None:
     assert kwargs["dtype"] is None
 
 
-def test_load_kwargs_for_fp4_uses_4bit() -> None:
-    kwargs = build_unsloth_load_kwargs(_config(quantization="fp4"))
-
-    assert kwargs["load_in_4bit"] is True
-    assert kwargs["load_in_8bit"] is False
+def test_load_kwargs_for_fp4_is_rejected() -> None:
+    with pytest.raises(ValueError, match="fp4"):
+        build_unsloth_load_kwargs(_config(quantization="fp4"))
 
 
 def test_load_kwargs_for_int8_uses_8bit() -> None:

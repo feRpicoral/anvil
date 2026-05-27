@@ -77,6 +77,32 @@ def test_load_test_cases_assigns_case_id_when_missing(tmp_path: Path) -> None:
     assert [c.case_id for c in cases] == ["case-0000", "case-0001", "case-0002"]
 
 
+def test_load_test_cases_assigns_dense_case_ids_with_blank_lines(tmp_path: Path) -> None:
+    src = EVAL_FIXTURES / "test_cases.jsonl"
+    rows = [
+        {k: v for k, v in json.loads(line).items() if k != "case_id"}
+        for line in src.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    path = tmp_path / "blank-lines.jsonl"
+    path.write_text("\n" + "\n\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+    cases = load_test_cases(path)
+
+    assert [c.case_id for c in cases] == ["case-0000", "case-0001", "case-0002"]
+
+
+def test_load_test_cases_rejects_duplicate_case_ids(tmp_path: Path) -> None:
+    row = json.loads(
+        (EVAL_FIXTURES / "test_cases.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
+    path = tmp_path / "duplicate-cases.jsonl"
+    path.write_text(json.dumps(row) + "\n" + json.dumps(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate case_id"):
+        load_test_cases(path)
+
+
 def test_load_test_cases_raises_for_empty(tmp_path: Path) -> None:
     path = tmp_path / "empty.jsonl"
     path.write_text("", encoding="utf-8")
@@ -97,6 +123,29 @@ def test_load_fixture_predictions_raises_for_empty(tmp_path: Path) -> None:
     path.write_text("", encoding="utf-8")
 
     with pytest.raises(ValueError, match="no fixture predictions"):
+        load_fixture_predictions(path)
+
+
+def test_load_fixture_predictions_rejects_duplicate_case_ids(tmp_path: Path) -> None:
+    row = json.loads(
+        (EVAL_FIXTURES / "predictions_perfect.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
+    path = tmp_path / "duplicate-predictions.jsonl"
+    path.write_text(json.dumps(row) + "\n" + json.dumps(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate case_id"):
+        load_fixture_predictions(path)
+
+
+def test_load_fixture_predictions_rejects_negative_token_counts(tmp_path: Path) -> None:
+    row = json.loads(
+        (EVAL_FIXTURES / "predictions_perfect.jsonl").read_text(encoding="utf-8").splitlines()[0]
+    )
+    row["input_tokens"] = -1
+    path = tmp_path / "negative-tokens.jsonl"
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="input_tokens"):
         load_fixture_predictions(path)
 
 
@@ -144,6 +193,22 @@ fixtures_path = "{EVAL_FIXTURES / "predictions_perfect.jsonl"}"
     config_path = _write_config(tmp_path, body)
 
     with pytest.raises(ValueError, match="predictor must be"):
+        load_eval_config(config_path)
+
+
+def test_load_eval_config_rejects_unsafe_variant_names(tmp_path: Path) -> None:
+    body = f"""
+test_jsonl = "{EVAL_FIXTURES / "test_cases.jsonl"}"
+output_dir = "{tmp_path / "out"}"
+
+[[variant]]
+name = "../outside"
+predictor = "fixture"
+fixtures_path = "{EVAL_FIXTURES / "predictions_perfect.jsonl"}"
+"""
+    config_path = _write_config(tmp_path, body)
+
+    with pytest.raises(ValueError, match="invalid variant name"):
         load_eval_config(config_path)
 
 

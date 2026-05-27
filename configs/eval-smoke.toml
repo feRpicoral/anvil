@@ -1,6 +1,3 @@
-# Eval smoke: 3 fixture variants over the in-repo test slice. Zero API
-# spend, zero GPU. Validates the three-way pipeline (load cases → run
-# variant → summarize → comparison JSON) without exercising real predictors.
 test_jsonl = "tests/data/fixtures/eval/test_cases.jsonl"
 output_dir = "results/eval/smoke"
 

@@ -93,8 +93,6 @@ module = [
     "transformers.*",
     "datasets.*",
     "bitsandbytes.*",
-    "accelerate.*",
-    "unsloth.*",
     "torch.*",
 ]
 ignore_missing_imports = true

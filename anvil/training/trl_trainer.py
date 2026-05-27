@@ -35,6 +35,7 @@ def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
     try:
         import datasets  # noqa: F401
         import peft  # noqa: F401
+        import torch  # noqa: F401
         import transformers  # noqa: F401
         import trl  # noqa: F401
     except ImportError as exc:
@@ -47,16 +48,30 @@ def load_messages_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read a messages-format JSONL into a list of `{"messages": [...]}` rows."""
     records: list[dict[str, Any]] = []
     with path.open(encoding="utf-8") as fh:
-        for line in fh:
+        for line_number, line in enumerate(fh, start=1):
             stripped = line.strip()
             if not stripped:
                 continue
-            row = json.loads(stripped)
+            try:
+                row = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}:{line_number}: invalid JSON") from exc
             if not isinstance(row, dict):
-                raise ValueError(f"{path}: row is not a JSON object")
+                raise ValueError(f"{path}:{line_number}: row is not a JSON object")
             messages = row.get("messages")
             if not isinstance(messages, list) or not messages:
-                raise ValueError(f"{path}: row missing non-empty 'messages' list")
+                raise ValueError(f"{path}:{line_number}: row missing non-empty 'messages' list")
+            for index, message in enumerate(messages):
+                if not isinstance(message, dict):
+                    raise ValueError(
+                        f"{path}:{line_number}: messages[{index}] is not a JSON object"
+                    )
+                role = message.get("role")
+                content = message.get("content")
+                if not isinstance(role, str) or not role:
+                    raise ValueError(f"{path}:{line_number}: messages[{index}].role must be set")
+                if not isinstance(content, str) or not content:
+                    raise ValueError(f"{path}:{line_number}: messages[{index}].content must be set")
             records.append(row)
     if not records:
         raise ValueError(f"{path}: no records found")
@@ -77,6 +92,7 @@ def build_lora_kwargs(config: TrainingConfig) -> dict[str, Any]:
 
 def build_sft_kwargs(config: TrainingConfig) -> dict[str, Any]:
     """Materialize the SFTConfig kwargs from a `TrainingConfig`."""
+    eval_strategy = config.eval_strategy if config.val_jsonl is not None else "no"
     kwargs: dict[str, Any] = {
         "output_dir": str(config.output_dir),
         "num_train_epochs": config.epochs,
@@ -89,13 +105,13 @@ def build_sft_kwargs(config: TrainingConfig) -> dict[str, Any]:
         "max_length": config.max_seq_len,
         "seed": config.seed,
         "save_strategy": config.save_strategy,
-        "eval_strategy": config.eval_strategy if config.val_jsonl is not None else "no",
+        "eval_strategy": eval_strategy,
         "save_total_limit": config.save_total_limit,
         "logging_steps": 5,
         "logging_strategy": "steps",
         "report_to": ["wandb"] if config.wandb_project else [],
     }
-    if config.eval_strategy == "steps" and config.eval_steps is not None:
+    if eval_strategy == "steps" and config.eval_steps is not None:
         kwargs["eval_steps"] = config.eval_steps
     if config.save_strategy == "steps" and config.save_steps is not None:
         kwargs["save_steps"] = config.save_steps
@@ -109,27 +125,30 @@ def build_model_kwargs(config: TrainingConfig) -> dict[str, Any]:
     is unavailable). `nf4` / `fp4` / `int8` go through `BitsAndBytesConfig`
     and require a CUDA host.
     """
-    import torch
-    from transformers import BitsAndBytesConfig
+    try:
+        import torch
+        from transformers import BitsAndBytesConfig
+    except ImportError as exc:
+        raise ImportError(_INSTALL_HINT) from exc
 
     kwargs: dict[str, Any] = {}
     if config.quantization == "bf16":
         kwargs["torch_dtype"] = torch.bfloat16
-    elif config.quantization == "nf4":
+    elif config.quantization in {"nf4", "fp4", "int8"}:
+        try:
+            import bitsandbytes  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(_INSTALL_HINT) from exc
+        if config.quantization == "int8":
+            kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+            return kwargs
+        quant_type = config.quantization
         kwargs["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
+            bnb_4bit_quant_type=quant_type,
             bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,
+            bnb_4bit_use_double_quant=quant_type == "nf4",
         )
-    elif config.quantization == "fp4":
-        kwargs["quantization_config"] = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="fp4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
-    elif config.quantization == "int8":
-        kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
     return kwargs
 
 

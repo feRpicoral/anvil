@@ -75,10 +75,26 @@ def test_load_messages_jsonl_rejects_non_object_row(tmp_path: Path) -> None:
         load_messages_jsonl(path)
 
 
+def test_load_messages_jsonl_rejects_malformed_json(tmp_path: Path) -> None:
+    path = tmp_path / "bad.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"messages": [}\n', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid JSON"):
+        load_messages_jsonl(path)
+
+
 def test_load_messages_jsonl_rejects_missing_messages(tmp_path: Path) -> None:
     path = _write_jsonl(tmp_path / "bad.jsonl", [{"content": "no messages key"}])
 
     with pytest.raises(ValueError, match="messages"):
+        load_messages_jsonl(path)
+
+
+def test_load_messages_jsonl_rejects_invalid_message_shape(tmp_path: Path) -> None:
+    path = _write_jsonl(tmp_path / "bad.jsonl", [{"messages": [{"role": "user"}]}])
+
+    with pytest.raises(ValueError, match="content"):
         load_messages_jsonl(path)
 
 
@@ -163,6 +179,13 @@ def test_build_sft_kwargs_carries_steps_when_strategy_is_steps() -> None:
 
     assert kwargs["eval_steps"] == 50
     assert kwargs["save_steps"] == 100
+
+
+def test_build_sft_kwargs_omits_eval_steps_when_eval_disabled_without_val() -> None:
+    kwargs = build_sft_kwargs(_config(eval_strategy="steps", eval_steps=50, val_jsonl=None))
+
+    assert kwargs["eval_strategy"] == "no"
+    assert "eval_steps" not in kwargs
 
 
 def test_build_sft_kwargs_omits_eval_steps_when_strategy_is_not_steps() -> None:

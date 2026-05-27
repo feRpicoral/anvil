@@ -66,6 +66,11 @@ def test_generator_rejects_zero_max_tokens() -> None:
         AnthropicGenerator(client=MagicMock(), max_tokens=0)
 
 
+def test_generator_rejects_invalid_temperature() -> None:
+    with pytest.raises(ValueError, match="temperature must be between 0 and 1"):
+        AnthropicGenerator(client=MagicMock(), temperature=1.1)
+
+
 def test_generate_returns_generation_result() -> None:
     payload = _valid_payload()
     generator, _ = _make_generator(json.dumps(payload))
@@ -126,6 +131,13 @@ def test_generate_raises_on_missing_keys() -> None:
         asyncio.run(generator.generate("nda", "sys", "user", seed=0))
 
 
+def test_generate_raises_when_extraction_fails_schema() -> None:
+    generator, _ = _make_generator(json.dumps({"contract_text": "ok", "extraction": {}}))
+
+    with pytest.raises(RuntimeError, match="extraction does not match schema"):
+        asyncio.run(generator.generate("nda", "sys", "user", seed=0))
+
+
 def test_generate_raises_when_no_text_blocks() -> None:
     client = MagicMock()
     response = MagicMock()
@@ -145,7 +157,11 @@ def test_generate_passes_system_and_user_to_api() -> None:
 
     assert create.await_args is not None
     kwargs = create.await_args.kwargs
-    assert kwargs["system"] == "system text"
+    assert kwargs["system"].startswith("system text")
+    assert "Use this JSON Schema" in kwargs["system"]
+    assert "contract_text" in kwargs["system"]
+    assert "extraction" in kwargs["system"]
     assert kwargs["messages"][0]["content"] == "user text"
-    assert kwargs["max_tokens"] == 4096
+    assert kwargs["max_tokens"] == 8192
+    assert kwargs["temperature"] == 0.0
     assert kwargs["model"] == "claude-sonnet-4-6"

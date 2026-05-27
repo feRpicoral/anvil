@@ -141,3 +141,10 @@ def test_generate_raises_when_extraction_not_object() -> None:
 
     with pytest.raises(RuntimeError, match="extraction is not an object"):
         asyncio.run(generator.generate("nda", "sys", "user", seed=0))
+
+
+def test_generate_raises_when_extraction_fails_schema() -> None:
+    generator, _ = _make_generator(json.dumps({"contract_text": "ok", "extraction": {}}))
+
+    with pytest.raises(RuntimeError, match="extraction does not match schema"):
+        asyncio.run(generator.generate("nda", "sys", "user", seed=0))

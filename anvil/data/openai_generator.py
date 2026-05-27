@@ -23,7 +23,11 @@ from openai.types.shared_params.response_format_json_schema import JSONSchema
 
 from anvil.data.pricing import OPENAI_PRICES, compute_cost_usd
 from anvil.data.prompts import ContractType
-from anvil.data.synthesis import GenerationResult, synthesis_response_schema
+from anvil.data.synthesis import (
+    GenerationResult,
+    synthesis_response_schema,
+    validate_generation_payload,
+)
 
 _DEFAULT_MODEL = "gpt-4o-2024-08-06"
 
@@ -94,12 +98,4 @@ class OpenAIGenerator:
 
 def _parse_payload(content: str) -> dict[str, Any]:
     parsed: Any = json.loads(content)
-    if not isinstance(parsed, dict):
-        raise RuntimeError("OpenAI response is not a JSON object")
-    if "contract_text" not in parsed or "extraction" not in parsed:
-        raise RuntimeError("OpenAI response missing contract_text or extraction")
-    if not isinstance(parsed["contract_text"], str):
-        raise RuntimeError("OpenAI response contract_text is not a string")
-    if not isinstance(parsed["extraction"], dict):
-        raise RuntimeError("OpenAI response extraction is not an object")
-    return parsed
+    return validate_generation_payload(parsed, "OpenAI")

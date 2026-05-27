@@ -16,10 +16,15 @@ from anthropic import AsyncAnthropic
 
 from anvil.data.pricing import ANTHROPIC_PRICES, compute_cost_usd
 from anvil.data.prompts import ContractType
-from anvil.data.synthesis import GenerationResult
+from anvil.data.synthesis import (
+    GenerationResult,
+    synthesis_response_schema,
+    validate_generation_payload,
+)
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
-_DEFAULT_MAX_TOKENS = 4096
+_DEFAULT_MAX_TOKENS = 8192
+_DEFAULT_TEMPERATURE = 0.0
 
 
 class AnthropicGenerator:
@@ -31,14 +36,18 @@ class AnthropicGenerator:
         api_key: str | None = None,
         model: str = _DEFAULT_MODEL,
         max_tokens: int = _DEFAULT_MAX_TOKENS,
+        temperature: float = _DEFAULT_TEMPERATURE,
         client: AsyncAnthropic | None = None,
     ) -> None:
         if model not in ANTHROPIC_PRICES:
             raise ValueError(f"unknown Anthropic model for pricing: {model!r}")
         if max_tokens <= 0:
             raise ValueError("max_tokens must be positive")
+        if not 0 <= temperature <= 1:
+            raise ValueError("temperature must be between 0 and 1")
         self._model = model
         self._max_tokens = max_tokens
+        self._temperature = temperature
         self._client = client if client is not None else AsyncAnthropic(api_key=api_key)
 
     @property
@@ -52,14 +61,13 @@ class AnthropicGenerator:
         user_prompt: str,
         seed: int,
     ) -> GenerationResult:
-        # Claude doesn't expose a seed; the kwarg stays in the signature for
-        # Protocol parity. Determinism on Claude is achieved by temperature=0
-        # plus stable prompts, both of which apply by default here.
+        # Claude does not expose a seed parameter.
         del seed
         response = await self._client.messages.create(
             model=self._model,
             max_tokens=self._max_tokens,
-            system=system_prompt,
+            temperature=self._temperature,
+            system=_system_prompt_with_schema(system_prompt),
             messages=[{"role": "user", "content": user_prompt}],
         )
         text = _join_text_blocks(response.content)
@@ -94,15 +102,16 @@ def _parse_payload(text: str) -> dict[str, Any]:
     """Pull the first JSON object out of `text`, stripping code fences."""
     cleaned = _strip_code_fence(text.strip())
     parsed: Any = json.loads(cleaned)
-    if not isinstance(parsed, dict):
-        raise RuntimeError("Anthropic response is not a JSON object")
-    if "contract_text" not in parsed or "extraction" not in parsed:
-        raise RuntimeError("Anthropic response missing contract_text or extraction")
-    if not isinstance(parsed["contract_text"], str):
-        raise RuntimeError("Anthropic response contract_text is not a string")
-    if not isinstance(parsed["extraction"], dict):
-        raise RuntimeError("Anthropic response extraction is not an object")
-    return parsed
+    return validate_generation_payload(parsed, "Anthropic")
+
+
+def _system_prompt_with_schema(system_prompt: str) -> str:
+    schema = json.dumps(synthesis_response_schema()["schema"], ensure_ascii=False, sort_keys=True)
+    schema_instruction = f"Use this JSON Schema for the full response object:\n{schema}"
+    stripped = system_prompt.rstrip()
+    if not stripped:
+        return schema_instruction
+    return f"{stripped}\n\n{schema_instruction}"
 
 
 def _strip_code_fence(text: str) -> str:

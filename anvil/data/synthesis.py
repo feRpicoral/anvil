@@ -82,6 +82,25 @@ def synthesis_response_schema() -> dict[str, Any]:
     }
 
 
+def validate_generation_payload(payload: Any, source: str) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{source} response is not a JSON object")
+    if "contract_text" not in payload or "extraction" not in payload:
+        raise RuntimeError(f"{source} response missing contract_text or extraction")
+    if not isinstance(payload["contract_text"], str):
+        raise RuntimeError(f"{source} response contract_text is not a string")
+    if not isinstance(payload["extraction"], dict):
+        raise RuntimeError(f"{source} response extraction is not an object")
+    try:
+        extraction = ContractExtraction.model_validate(payload["extraction"])
+    except ValidationError as exc:
+        raise RuntimeError(f"{source} response extraction does not match schema") from exc
+    return {
+        "contract_text": payload["contract_text"],
+        "extraction": extraction.model_dump(mode="json"),
+    }
+
+
 class FixtureGenerator:
     """Replay pre-recorded synthesis outputs from disk.
 

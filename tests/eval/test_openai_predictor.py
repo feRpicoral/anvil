@@ -53,11 +53,16 @@ def _extraction_payload() -> dict[str, Any]:
     }
 
 
-def _make_predictor(content: str, **usage: int) -> tuple[OpenAIExtractionPredictor, AsyncMock]:
+def _make_predictor(
+    content: str,
+    *,
+    seed: int | None = 0,
+    **usage: int,
+) -> tuple[OpenAIExtractionPredictor, AsyncMock]:
     client = MagicMock()
     create = AsyncMock(return_value=_fake_response(content, **usage))
     client.chat.completions.create = create
-    return OpenAIExtractionPredictor(client=client), create
+    return OpenAIExtractionPredictor(client=client, seed=seed), create
 
 
 def test_predictor_rejects_unknown_model() -> None:
@@ -99,11 +104,10 @@ def test_predict_computes_cost_from_pricing() -> None:
 
     prediction = asyncio.run(predictor.predict("contract text"))
 
-    # gpt-4o-2024-08-06 is $2.50 input + $10 output per 1M tokens.
     assert prediction.cost_usd == pytest.approx(2.50 + 10.00)
 
 
-def test_predict_passes_strict_response_format_to_api() -> None:
+def test_predict_passes_seed_and_strict_response_format_to_api() -> None:
     predictor, create = _make_predictor(json.dumps(_extraction_payload()))
 
     asyncio.run(predictor.predict("This Mutual NDA..."))
@@ -111,6 +115,7 @@ def test_predict_passes_strict_response_format_to_api() -> None:
     assert create.await_args is not None
     kwargs = create.await_args.kwargs
     assert kwargs["model"] == "gpt-4o-2024-08-06"
+    assert kwargs["seed"] == 0
     assert kwargs["messages"][0]["role"] == "system"
     assert "JSON object" in kwargs["messages"][0]["content"]
     assert kwargs["messages"][1]["role"] == "user"
@@ -120,6 +125,15 @@ def test_predict_passes_strict_response_format_to_api() -> None:
     assert schema["name"] == "contract_extraction"
     assert schema["strict"] is True
     assert "parties" in schema["schema"]["properties"]
+
+
+def test_predict_can_disable_seed() -> None:
+    predictor, create = _make_predictor(json.dumps(_extraction_payload()), seed=None)
+
+    asyncio.run(predictor.predict("This Mutual NDA..."))
+
+    assert create.await_args is not None
+    assert "seed" not in create.await_args.kwargs
 
 
 def test_predict_propagates_token_counts() -> None:

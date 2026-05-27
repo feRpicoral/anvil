@@ -1,15 +1,4 @@
-"""OpenAI GPT-4o extraction predictor for the three-way eval.
-
-Implements the `ExtractionPredictor` Protocol against the OpenAI API with
-strict JSON Schema enforcement. The system prompt asks for the structured
-extraction only (no contract text echo); the user prompt carries the
-contract text. `response_format` constrains the model to emit JSON that
-conforms to `ContractExtraction`'s schema.
-
-This is the baseline the fine-tuned model is compared against. Lives in
-`anvil/eval/` rather than `anvil/data/` because extraction is the eval
-task, not synthesis.
-"""
+"""OpenAI GPT-4o extraction predictor for the three-way eval."""
 
 from __future__ import annotations
 
@@ -40,7 +29,6 @@ _SYSTEM_PROMPT = (
 
 
 def extraction_response_schema() -> dict[str, Any]:
-    """Wrap the strict `ContractExtraction` schema for OpenAI structured outputs."""
     schema = contract_extraction_json_schema()
     return {
         "name": _RESPONSE_SCHEMA_NAME,
@@ -50,18 +38,18 @@ def extraction_response_schema() -> dict[str, Any]:
 
 
 class OpenAIExtractionPredictor:
-    """Async GPT-4o predictor with strict JSON-schema-constrained outputs."""
-
     def __init__(
         self,
         *,
         api_key: str | None = None,
         model: str = _DEFAULT_MODEL,
+        seed: int | None = 0,
         client: AsyncOpenAI | None = None,
     ) -> None:
         if model not in OPENAI_PRICES:
             raise ValueError(f"unknown OpenAI model for pricing: {model!r}")
         self._model = model
+        self._seed = seed
         self._client = client if client is not None else AsyncOpenAI(api_key=api_key)
 
     @property
@@ -80,11 +68,14 @@ class OpenAIExtractionPredictor:
             "schema": schema["schema"],
         }
         response_format = ResponseFormatJSONSchema(type="json_schema", json_schema=json_schema)
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            response_format=response_format,
-        )
+        request: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "response_format": response_format,
+        }
+        if self._seed is not None:
+            request["seed"] = self._seed
+        response = await self._client.chat.completions.create(**request)
         choice = response.choices[0]
         refusal = getattr(choice.message, "refusal", None)
         if refusal:

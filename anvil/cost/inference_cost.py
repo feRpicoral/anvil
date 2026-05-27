@@ -1,11 +1,9 @@
-# Vendored from forge@2b9d733fb6b0df49a2c55fca7d879a4240843b72
-# (forge/cost/pricing.py + forge/cost/model.py, combined verbatim).
-# When Forge updates its cost module, refresh this file from the upstream
-# revision and bump the SHA in this header.
+# Adapted from forge@2b9d733fb6b0df49a2c55fca7d879a4240843b72
+# (forge/cost/pricing.py + forge/cost/model.py).
 """Self-hosted vs commercial API cost-per-1M-tokens model + pricing tables.
 
-The math is intentionally trivial — `(hourly $) / (tokens-per-second * 3600 / 1e6)`
-— but the value of this module is in making every input explicit. Every
+The math is intentionally trivial: `(hourly $) / (tokens-per-second * 3600 / 1e6)`.
+The value of this module is in making every input explicit. Every
 inference-cost chart in the README must come from a structured payload
 produced here, with the assumptions surfaced.
 
@@ -15,14 +13,16 @@ working notes; before any paid run that quotes these numbers, refresh both
 tables against current rates and re-run the chart pipeline.
 
 Sources:
-- RunPod community tier pricing: https://runpod.io/pricing (as of 2026-05-26)
-- OpenAI API pricing:            https://openai.com/api/pricing (as of 2026-05-26)
-- Anthropic Claude API pricing:  https://www.anthropic.com/pricing (as of 2026-05-26)
+- RunPod community tier pricing: https://runpod.io/pricing (as of 2026-05-27)
+- OpenAI API pricing:            https://openai.com/api/pricing (as of 2026-05-27)
+- Anthropic Claude API pricing:  https://www.anthropic.com/pricing (as of 2026-05-27)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
+from anvil.data.pricing import ANTHROPIC_PRICES, OPENAI_PRICES
 
 
 @dataclass(frozen=True)
@@ -53,46 +53,54 @@ class ApiPricing:
         return self.input_usd_per_1m * input_share + self.output_usd_per_1m * output_share
 
 
-# Single source of truth for GPU pricing. Add tiers, don't redefine them inline.
+def _api_pricing(name: str, prices: tuple[float, float]) -> ApiPricing:
+    input_usd_per_1m, output_usd_per_1m = prices
+    return ApiPricing(
+        name=name,
+        input_usd_per_1m=input_usd_per_1m,
+        output_usd_per_1m=output_usd_per_1m,
+    )
+
+
 GPU_TIERS: dict[str, GpuTier] = {
     "runpod-rtx-4090-community": GpuTier(
         name="RunPod RTX 4090 (Community)",
-        hourly_usd=0.34,
+        hourly_usd=0.69,
         vram_gb=24,
         notes="The benchmark target. Fits Llama 3.1 8B BF16 + KV cache headroom.",
     ),
-    "runpod-a100-40gb-community": GpuTier(
-        name="RunPod A100 40GB (Community)",
-        hourly_usd=1.19,
-        vram_gb=40,
-        notes="Out of budget for the scoped run; included for sensitivity analysis.",
-    ),
-    "runpod-a100-80gb-community": GpuTier(
-        name="RunPod A100 80GB (Community)",
-        hourly_usd=1.89,
+    "runpod-a100-pcie-80gb-community": GpuTier(
+        name="RunPod A100 PCIe 80GB (Community)",
+        hourly_usd=1.39,
         vram_gb=80,
         notes="Out of budget for the scoped run; included for sensitivity analysis.",
     ),
-    "runpod-h100-80gb-community": GpuTier(
-        name="RunPod H100 80GB (Community)",
-        hourly_usd=2.99,
+    "runpod-a100-sxm-80gb-community": GpuTier(
+        name="RunPod A100 SXM 80GB (Community)",
+        hourly_usd=1.49,
         vram_gb=80,
-        notes="Native FP8. Out of budget; reference for cost-scaling discussion.",
+        notes="Out of budget for the scoped run; included for sensitivity analysis.",
+    ),
+    "runpod-h100-pcie-80gb-community": GpuTier(
+        name="RunPod H100 PCIe 80GB (Community)",
+        hourly_usd=2.89,
+        vram_gb=80,
+        notes="Out of budget; reference for cost-scaling discussion.",
+    ),
+    "runpod-h100-sxm-80gb-community": GpuTier(
+        name="RunPod H100 SXM 80GB (Community)",
+        hourly_usd=3.29,
+        vram_gb=80,
+        notes="Out of budget; reference for cost-scaling discussion.",
     ),
 }
 
 
-# Approximate commercial API pricing as of 2026-05-26. Update the numbers AND
-# the source links above when refreshing.
 API_PRICING: dict[str, ApiPricing] = {
-    "gpt-4o": ApiPricing(name="GPT-4o", input_usd_per_1m=2.50, output_usd_per_1m=10.00),
-    "gpt-4o-mini": ApiPricing(name="GPT-4o mini", input_usd_per_1m=0.15, output_usd_per_1m=0.60),
-    "claude-sonnet-4-6": ApiPricing(
-        name="Claude Sonnet 4.6", input_usd_per_1m=3.00, output_usd_per_1m=15.00
-    ),
-    "claude-haiku-4-5": ApiPricing(
-        name="Claude Haiku 4.5", input_usd_per_1m=0.80, output_usd_per_1m=4.00
-    ),
+    "gpt-4o": _api_pricing("GPT-4o", OPENAI_PRICES["gpt-4o"]),
+    "gpt-4o-mini": _api_pricing("GPT-4o mini", OPENAI_PRICES["gpt-4o-mini"]),
+    "claude-sonnet-4-6": _api_pricing("Claude Sonnet 4.6", ANTHROPIC_PRICES["claude-sonnet-4-6"]),
+    "claude-haiku-4-5": _api_pricing("Claude Haiku 4.5", ANTHROPIC_PRICES["claude-haiku-4-5"]),
 }
 
 
@@ -119,6 +127,8 @@ def self_hosted_cost_per_1m_tokens(
     """
     if sustained_throughput_tps <= 0:
         raise ValueError(f"sustained_throughput_tps must be > 0, got {sustained_throughput_tps}")
+    if gpu_hourly_usd < 0:
+        raise ValueError(f"gpu_hourly_usd must be >= 0, got {gpu_hourly_usd}")
     if not 0.0 < utilization <= 1.0:
         raise ValueError(f"utilization must be in (0, 1], got {utilization}")
     return gpu_hourly_usd * 1e6 / (3600.0 * sustained_throughput_tps * utilization)
@@ -197,10 +207,13 @@ def build_self_hosted(
 ) -> SelfHostedCost:
     """Compute a ``SelfHostedCost`` from a benchmark number + GPU tier key.
 
-    The key must exist in ``GPU_TIERS`` — typos crash loud rather than silently
+    The key must exist in ``GPU_TIERS``. Typos crash loud rather than silently
     producing the wrong cost.
     """
-    tier = GPU_TIERS[gpu_tier_key]
+    try:
+        tier = GPU_TIERS[gpu_tier_key]
+    except KeyError as exc:
+        raise ValueError(f"unknown GPU tier key: {gpu_tier_key!r}") from exc
     usd = self_hosted_cost_per_1m_tokens(
         sustained_throughput_tps=sustained_throughput_tps,
         gpu_hourly_usd=tier.hourly_usd,
@@ -230,7 +243,10 @@ def compare(
 
     api: list[CostScenario] = []
     for key in api_keys:
-        pricing: ApiPricing = API_PRICING[key]
+        try:
+            pricing = API_PRICING[key]
+        except KeyError as exc:
+            raise ValueError(f"unknown API pricing key: {key!r}") from exc
         blended = pricing.blended_per_1m(input_share=input_share)
         api.append(
             CostScenario(

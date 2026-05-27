@@ -1,0 +1,39 @@
+{
+  "contract_type": "nda",
+  "contract_text": "# Mutual Confidentiality Agreement\n\nThis Mutual Confidentiality Agreement is entered into on 1 March 2026 between Helios Renewables plc, incorporated in England and Wales (the \"First Party\"), and Aurora Energy Pty Ltd, incorporated in New South Wales, Australia (the \"Second Party\").\n\n## 1. Purpose\nThe parties intend to discuss a potential commercial collaboration in offshore wind generation and shall exchange non-public technical, commercial, and financial information.\n\n## 2. Term\nThe initial term is thirty-six (36) months from the date first written above. Each party's confidentiality obligations survive for ten (10) years from receipt of the relevant Confidential Information.\n\n## 3. Exclusions\nConfidential Information excludes information that is or becomes public through no breach of this Agreement, was already in the receiving party's possession without restriction, or is independently developed without use of the disclosed information.\n\n## 4. Governing Law\nThis Agreement shall be governed by and construed in accordance with the laws of England and Wales.\n\n## 5. Disputes\nAny dispute arising out of or in connection with this Agreement shall be referred to and finally resolved by arbitration under the LCIA Rules. The seat of arbitration shall be London.\n\n## 6. Termination\nEither party may terminate this Agreement for material breach following sixty (60) days' written notice and a thirty (30) day cure period.",
+  "extraction": {
+    "parties": [
+      {"name": "Helios Renewables plc", "role": "disclosing_party"},
+      {"name": "Aurora Energy Pty Ltd", "role": "receiving_party"}
+    ],
+    "effective_date": "2026-03-01",
+    "term": {
+      "duration_months": 36,
+      "is_perpetual": false,
+      "auto_renew": false,
+      "renewal_notice_days": null
+    },
+    "governing_law": "England and Wales",
+    "jurisdiction": null,
+    "confidentiality": {
+      "scope": "Non-public technical, commercial, and financial information exchanged in connection with a potential offshore wind collaboration.",
+      "duration_months": 120,
+      "carveouts": [
+        "information that becomes public without breach",
+        "information already in the receiving party's possession without restriction",
+        "independently developed information"
+      ]
+    },
+    "termination": {
+      "triggers": ["material breach"],
+      "notice_days": 60,
+      "cure_period_days": 30
+    },
+    "indemnification": null,
+    "dispute_resolution": {
+      "forum": "arbitration",
+      "venue": "London",
+      "governing_rules": "LCIA Rules"
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "contract_type": "msa",
+  "contract_text": "# Master Services Agreement\n\nThis Master Services Agreement (the \"Agreement\") is entered into as of January 1, 2026 between Cloudforge Inc., a Massachusetts corporation (\"Vendor\"), and Beacon Financial Services, a Massachusetts corporation (\"Client\").\n\n## 1. Scope of Services\nVendor will provide cloud hosting, managed services, and support for the platforms identified in mutually-executed Statements of Work.\n\n## 2. Term and Renewal\nThe initial term is thirty-six (36) months. The Agreement renews automatically for successive twelve-month terms unless either party provides ninety (90) days' written notice of non-renewal.\n\n## 3. Confidentiality\nEach party will protect the other party's Confidential Information, including customer data, service architecture, and pricing terms. Publicly available information is excluded. The obligation has no fixed expiration.\n\n## 4. Indemnification\nVendor will indemnify Client against third-party intellectual-property infringement claims and claims arising from Vendor's gross negligence. Vendor's aggregate liability under this clause is capped at two times (2x) the fees paid by Client during the twelve months preceding the claim.\n\n## 5. Termination\nEither party may terminate this Agreement for material breach upon sixty (60) days' written notice and a thirty (30) day cure period, for insolvency, or for convenience with sixty (60) days' notice.\n\n## 6. Governing Law and Disputes\nThis Agreement is governed by the laws of the Commonwealth of Massachusetts. Disputes will first be submitted to non-binding mediation and, if unresolved, to binding arbitration under the AAA Commercial Arbitration Rules in Boston, Massachusetts.",
+  "extraction": {
+    "parties": [
+      {"name": "Cloudforge Inc.", "role": "vendor"},
+      {"name": "Beacon Financial Services", "role": "client"}
+    ],
+    "effective_date": "2026-01-01",
+    "term": {
+      "duration_months": 36,
+      "is_perpetual": false,
+      "auto_renew": true,
+      "renewal_notice_days": 90
+    },
+    "governing_law": "Commonwealth of Massachusetts",
+    "jurisdiction": null,
+    "confidentiality": {
+      "scope": "Customer data, service architecture, and pricing terms.",
+      "duration_months": null,
+      "carveouts": ["publicly available information"]
+    },
+    "termination": {
+      "triggers": ["material breach", "insolvency", "convenience with 60 days notice"],
+      "notice_days": 60,
+      "cure_period_days": 30
+    },
+    "indemnification": {
+      "scope": "Third-party IP infringement claims and gross negligence.",
+      "cap_usd": null,
+      "cap_multiplier": 2.0
+    },
+    "dispute_resolution": {
+      "forum": "mediation_then_arbitration",
+      "venue": "Boston, Massachusetts",
+      "governing_rules": "AAA Commercial Arbitration Rules"
+    }
+  }
+}

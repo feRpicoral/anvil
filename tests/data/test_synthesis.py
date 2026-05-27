@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,6 +29,9 @@ def test_synthesis_response_schema_is_strict() -> None:
     assert set(body["required"]) == {"contract_text", "extraction"}
     assert body["properties"]["contract_text"]["type"] == "string"
     assert body["properties"]["extraction"]["type"] == "object"
+    assert "$defs" in body
+    assert "$defs" not in body["properties"]["extraction"]
+    _assert_refs_resolve_to_root_defs(body)
 
 
 def test_fixture_generator_indexes_all_contract_types() -> None:
@@ -102,7 +107,7 @@ def test_fixture_generator_raises_for_unknown_contract_type(tmp_path: Path) -> N
         "contract_text": "...",
         "extraction": {},
     }
-    (tmp_path / "bad.json").write_text(__import__("json").dumps(fixture))
+    (tmp_path / "bad.json").write_text(json.dumps(fixture))
 
     with pytest.raises(ValueError, match="contract_type"):
         FixtureGenerator(tmp_path)
@@ -110,9 +115,45 @@ def test_fixture_generator_raises_for_unknown_contract_type(tmp_path: Path) -> N
 
 def test_fixture_generator_raises_when_keys_missing(tmp_path: Path) -> None:
     fixture = {"contract_type": "nda"}
-    (tmp_path / "bad.json").write_text(__import__("json").dumps(fixture))
+    (tmp_path / "bad.json").write_text(json.dumps(fixture))
 
     with pytest.raises(ValueError, match="missing contract_text"):
+        FixtureGenerator(tmp_path)
+
+
+def test_fixture_generator_raises_when_contract_text_is_not_string(tmp_path: Path) -> None:
+    fixture = {
+        "contract_type": "nda",
+        "contract_text": 123,
+        "extraction": {},
+    }
+    (tmp_path / "bad.json").write_text(json.dumps(fixture))
+
+    with pytest.raises(ValueError, match="contract_text must be a string"):
+        FixtureGenerator(tmp_path)
+
+
+def test_fixture_generator_raises_when_extraction_is_not_object(tmp_path: Path) -> None:
+    fixture = {
+        "contract_type": "nda",
+        "contract_text": "...",
+        "extraction": [],
+    }
+    (tmp_path / "bad.json").write_text(json.dumps(fixture))
+
+    with pytest.raises(ValueError, match="extraction must be an object"):
+        FixtureGenerator(tmp_path)
+
+
+def test_fixture_generator_raises_when_extraction_is_invalid(tmp_path: Path) -> None:
+    fixture = {
+        "contract_type": "nda",
+        "contract_text": "...",
+        "extraction": {},
+    }
+    (tmp_path / "bad.json").write_text(json.dumps(fixture))
+
+    with pytest.raises(ValueError, match="invalid extraction"):
         FixtureGenerator(tmp_path)
 
 
@@ -120,3 +161,23 @@ def test_fixture_generator_satisfies_protocol() -> None:
     generator = FixtureGenerator(FIXTURES_DIR)
 
     assert isinstance(generator, StructuredGenerator)
+
+
+def _assert_refs_resolve_to_root_defs(schema: dict[str, Any]) -> None:
+    refs: list[str] = []
+    _collect_refs(schema, refs)
+    assert refs
+    assert all(ref.startswith("#/$defs/") for ref in refs)
+    assert all(ref.removeprefix("#/$defs/") in schema["$defs"] for ref in refs)
+
+
+def _collect_refs(value: object, refs: list[str]) -> None:
+    if isinstance(value, dict):
+        ref = value.get("$ref")
+        if isinstance(ref, str):
+            refs.append(ref)
+        for child in value.values():
+            _collect_refs(child, refs)
+    elif isinstance(value, list):
+        for child in value:
+            _collect_refs(child, refs)

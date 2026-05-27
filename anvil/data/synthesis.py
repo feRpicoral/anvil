@@ -12,10 +12,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
+
+from pydantic import ValidationError
 
 from anvil.data.prompts import ContractType
-from anvil.data.schema import contract_extraction_json_schema
+from anvil.data.schema import ContractExtraction, contract_extraction_json_schema
 
 _SYNTHESIS_RESPONSE_NAME = "contract_synthesis"
 
@@ -58,21 +60,25 @@ def synthesis_response_schema() -> dict[str, Any]:
     already marks every property required.
     """
     extraction_schema = contract_extraction_json_schema()
+    extraction_defs = extraction_schema.pop("$defs", None)
+    schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "contract_text": {
+                "type": "string",
+                "description": "The contract itself, in plain Markdown.",
+            },
+            "extraction": extraction_schema,
+        },
+        "required": ["contract_text", "extraction"],
+    }
+    if extraction_defs is not None:
+        schema["$defs"] = extraction_defs
     return {
         "name": _SYNTHESIS_RESPONSE_NAME,
         "strict": True,
-        "schema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "contract_text": {
-                    "type": "string",
-                    "description": "The contract itself, in plain Markdown.",
-                },
-                "extraction": extraction_schema,
-            },
-            "required": ["contract_text", "extraction"],
-        },
+        "schema": schema,
     }
 
 
@@ -126,11 +132,34 @@ class FixtureGenerator:
 def _index_fixtures(fixtures_dir: Path) -> dict[ContractType, list[dict[str, Any]]]:
     by_type: dict[ContractType, list[dict[str, Any]]] = {}
     for path in sorted(fixtures_dir.glob("*.json")):
-        record = json.loads(path.read_text(encoding="utf-8"))
-        contract_type = record.get("contract_type")
-        if contract_type not in ("nda", "msa", "license"):
-            raise ValueError(f"{path.name}: contract_type must be nda/msa/license")
-        if "contract_text" not in record or "extraction" not in record:
-            raise ValueError(f"{path.name}: missing contract_text or extraction")
+        record = _load_fixture(path)
+        contract_type = record["contract_type"]
         by_type.setdefault(contract_type, []).append(record)
     return by_type
+
+
+def _load_fixture(path: Path) -> dict[str, Any]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path.name}: fixture must be a JSON object")
+    record = cast(dict[str, Any], raw)
+    contract_type = record.get("contract_type")
+    if contract_type not in ("nda", "msa", "license"):
+        raise ValueError(f"{path.name}: contract_type must be nda/msa/license")
+    if "contract_text" not in record or "extraction" not in record:
+        raise ValueError(f"{path.name}: missing contract_text or extraction")
+    contract_text = record.get("contract_text")
+    if not isinstance(contract_text, str):
+        raise ValueError(f"{path.name}: contract_text must be a string")
+    extraction = record.get("extraction")
+    if not isinstance(extraction, dict):
+        raise ValueError(f"{path.name}: extraction must be an object")
+    try:
+        validated = ContractExtraction.model_validate(extraction)
+    except ValidationError as exc:
+        raise ValueError(f"{path.name}: invalid extraction") from exc
+    return {
+        "contract_type": cast(ContractType, contract_type),
+        "contract_text": contract_text,
+        "extraction": validated.model_dump(mode="json"),
+    }

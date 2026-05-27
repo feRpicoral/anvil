@@ -9,6 +9,7 @@ dependency surface narrow.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -88,7 +89,7 @@ class PromptParameters:
     dispute_forum: str
     edge_case: str
     clause_complexity: ClauseComplexity = "standard"
-    extras: dict[str, str] = None  # type: ignore[assignment]
+    extras: Mapping[str, str] | None = None
 
 
 def system_prompt() -> str:

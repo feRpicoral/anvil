@@ -46,6 +46,23 @@ def test_clause_complexities_constant() -> None:
     assert set(CLAUSE_COMPLEXITIES) == {"minimal", "standard", "comprehensive"}
 
 
+def test_prompt_parameters_extras_default_to_none() -> None:
+    parameters = PromptParameters(
+        contract_type="nda",
+        party_a="Acme Corp.",
+        party_a_jurisdiction="Delaware",
+        party_b="Globex Industries LLC",
+        party_b_jurisdiction="Delaware",
+        effective_date="2026-02-15",
+        term_months=24,
+        governing_law="State of Delaware",
+        dispute_forum="litigation",
+        edge_case="none",
+    )
+
+    assert parameters.extras is None
+
+
 @pytest.mark.parametrize("contract_type", ["nda", "msa", "license"])
 def test_each_contract_type_renders(contract_type: str) -> None:
     extras: dict[str, str] = {}

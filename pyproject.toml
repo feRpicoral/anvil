@@ -7,6 +7,8 @@ requires-python = ">=3.12,<3.13"
 authors = [{ name = "Fernando Picoral", email = "fernandopicoral@gmail.com" }]
 license = { text = "MIT" }
 dependencies = [
+    "anthropic>=0.40,<1.0",
+    "openai>=1.50,<2.0",
     "pydantic>=2.7,<3.0",
     "rapidfuzz>=3.6,<4.0",
 ]

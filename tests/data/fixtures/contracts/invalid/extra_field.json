@@ -1,0 +1,20 @@
+{
+  "parties": [
+    {"name": "Acme Corp.", "role": "disclosing_party"},
+    {"name": "Globex Industries LLC", "role": "receiving_party"}
+  ],
+  "effective_date": "2026-02-15",
+  "term": {
+    "duration_months": 24,
+    "is_perpetual": false,
+    "auto_renew": false,
+    "renewal_notice_days": null
+  },
+  "governing_law": "State of Delaware",
+  "jurisdiction": null,
+  "confidentiality": null,
+  "termination": {"triggers": [], "notice_days": null, "cure_period_days": null},
+  "indemnification": null,
+  "dispute_resolution": {"forum": "litigation", "venue": null, "governing_rules": null},
+  "force_majeure": "Acts of God excepted"
+}

@@ -1,0 +1,35 @@
+{
+  "parties": [
+    {"name": "Acme Corp.", "role": "disclosing_party"},
+    {"name": "Globex Industries LLC", "role": "receiving_party"}
+  ],
+  "effective_date": "2026-02-15",
+  "term": {
+    "duration_months": 24,
+    "is_perpetual": false,
+    "auto_renew": false,
+    "renewal_notice_days": null
+  },
+  "governing_law": "State of Delaware",
+  "jurisdiction": "state and federal courts of New Castle County, Delaware",
+  "confidentiality": {
+    "scope": "All non-public technical and business information disclosed in writing or orally.",
+    "duration_months": 60,
+    "carveouts": [
+      "publicly available information",
+      "independently developed information",
+      "information received from a third party without confidentiality obligation"
+    ]
+  },
+  "termination": {
+    "triggers": ["material breach", "convenience with notice"],
+    "notice_days": 30,
+    "cure_period_days": 15
+  },
+  "indemnification": null,
+  "dispute_resolution": {
+    "forum": "litigation",
+    "venue": "Wilmington, Delaware",
+    "governing_rules": null
+  }
+}

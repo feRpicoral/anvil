@@ -1,0 +1,35 @@
+{
+  "parties": [
+    {"name": "Cloudforge Inc.", "role": "vendor"},
+    {"name": "Beacon Financial Services", "role": "client"}
+  ],
+  "effective_date": "2026-01-01",
+  "term": {
+    "duration_months": 36,
+    "is_perpetual": false,
+    "auto_renew": true,
+    "renewal_notice_days": 90
+  },
+  "governing_law": "Commonwealth of Massachusetts",
+  "jurisdiction": null,
+  "confidentiality": {
+    "scope": "Customer data, service architecture, and pricing terms.",
+    "duration_months": null,
+    "carveouts": ["publicly available information"]
+  },
+  "termination": {
+    "triggers": ["material breach", "insolvency", "convenience with 60 days notice"],
+    "notice_days": 60,
+    "cure_period_days": 30
+  },
+  "indemnification": {
+    "scope": "Third-party IP infringement claims and gross negligence.",
+    "cap_usd": null,
+    "cap_multiplier": 2.0
+  },
+  "dispute_resolution": {
+    "forum": "mediation_then_arbitration",
+    "venue": "Boston, Massachusetts",
+    "governing_rules": "AAA Commercial Arbitration Rules"
+  }
+}

@@ -17,7 +17,7 @@ help:
 	@echo ""
 	@echo "  data-smoke   50-sample fixture-replay dataset; zero API spend"
 	@echo "  data-full    4000-sample paid dataset (requires CONFIRM_PAID=1 and OPENAI_API_KEY)"
-	@echo "  train-smoke  generate smoke data and validate training config in dry-run"
+	@echo "  train-smoke  generate smoke data and run TRL smoke training"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -57,7 +57,7 @@ endif
 	$(PYTHON) -m scripts.split --input $(DATA_FULL_DIR)/curated.jsonl --output-dir $(DATA_FULL_DIR)
 
 train-smoke: data-smoke
-	$(PYTHON) -m scripts.train --config configs/train-smoke.toml --dry-run
+	$(PYTHON) -m scripts.train --config configs/train-smoke.toml
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

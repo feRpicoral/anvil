@@ -1,6 +1,5 @@
-# Dry-run smoke config for TRL + Qwen 2.5 0.5B on the fixture dataset.
-# It validates config parsing and local data paths without importing the
-# training stack; the real trainer smoke lands with the TRL driver.
+# Smoke config for TRL + Qwen 2.5 0.5B on the fixture dataset.
+# Requires the M1 training stack from constraints/train.txt.
 base_model = "Qwen/Qwen2.5-0.5B-Instruct"
 backend = "trl"
 output_dir = "outputs/smoke"

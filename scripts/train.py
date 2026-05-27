@@ -52,12 +52,16 @@ def _print_summary(config: TrainingConfig, *, file: TextIO) -> None:
         file.write(f"  wandb: project={config.wandb_project} run={config.wandb_run_name}\n")
 
 
-def _run_training(config: TrainingConfig, _resume_from: Path | None) -> int:
-    raise NotImplementedError(
-        f"Real {config.backend} training driver not yet wired; "
-        f"the follow-up PR installs the TRL/Unsloth stack via constraints/train.txt. "
-        f"Use --dry-run to validate this config in the meantime."
-    )
+def _run_training(config: TrainingConfig, resume_from: Path | None) -> int:
+    if config.backend == "trl":
+        from anvil.training.trl_trainer import train
+
+        return train(config, resume_from)
+    if config.backend == "unsloth":
+        raise NotImplementedError(
+            "Unsloth backend lands in a follow-up PR; use backend='trl' for the M1 smoke."
+        )
+    raise ValueError(f"unsupported backend: {config.backend!r}")
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

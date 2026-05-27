@@ -86,21 +86,34 @@ def find_near_duplicate_groups(
         appears in at most one group; the first member of each group acts as
         the canonical survivor that downstream dedup would keep.
     """
+    if not 0 <= threshold <= 1:
+        raise ValueError("threshold must be between 0 and 1")
+    if prefix_chars <= 0:
+        raise ValueError("prefix_chars must be positive")
+
+    parent = list(range(len(texts)))
+
+    def find(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    def union(left: int, right: int) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root != right_root:
+            parent[right_root] = left_root
+
     prefixes = [t[:prefix_chars] for t in texts]
     cutoff = threshold * 100
-    assigned = [False] * len(texts)
-    groups: list[set[int]] = []
     for i in range(len(texts)):
-        if assigned[i]:
-            continue
-        group = {i}
-        assigned[i] = True
         for j in range(i + 1, len(texts)):
-            if assigned[j]:
-                continue
             if fuzz.ratio(prefixes[i], prefixes[j]) >= cutoff:
-                group.add(j)
-                assigned[j] = True
-        if len(group) > 1:
-            groups.append(group)
-    return groups
+                union(i, j)
+
+    groups_by_root: dict[int, set[int]] = {}
+    for index in range(len(texts)):
+        root = find(index)
+        groups_by_root.setdefault(root, set()).add(index)
+    return [group for group in groups_by_root.values() if len(group) > 1]

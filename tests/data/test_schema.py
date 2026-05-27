@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import get_args
 
 import pytest
 from pydantic import ValidationError
 
-from anvil.data.schema import ContractExtraction, DisputeForum, PartyRole
+from anvil.data.schema import (
+    ContractExtraction,
+    DisputeForum,
+    PartyRole,
+    contract_extraction_json_schema,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 VALID_FIXTURES = sorted((FIXTURES / "valid").glob("*.json"))
@@ -15,6 +21,11 @@ INVALID_FIXTURES = sorted((FIXTURES / "invalid").glob("*.json"))
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _load(path: Path) -> dict[str, object]:
+    payload: dict[str, object] = json.loads(_read(path))
+    return payload
 
 
 @pytest.mark.parametrize("fixture", VALID_FIXTURES, ids=lambda p: p.stem)
@@ -76,18 +87,23 @@ def test_msa_carries_auto_renew_and_indemnification() -> None:
 
 
 def test_negative_duration_rejected() -> None:
-    payload = {
+    payload: dict[str, object] = {
         "parties": [
             {"name": "A", "role": "buyer"},
             {"name": "B", "role": "seller"},
         ],
+        "effective_date": None,
         "term": {
             "duration_months": -1,
             "is_perpetual": False,
             "auto_renew": False,
             "renewal_notice_days": None,
         },
+        "governing_law": None,
+        "jurisdiction": None,
+        "confidentiality": None,
         "termination": {"triggers": [], "notice_days": None, "cure_period_days": None},
+        "indemnification": None,
         "dispute_resolution": {"forum": "litigation", "venue": None, "governing_rules": None},
     }
 
@@ -95,9 +111,63 @@ def test_negative_duration_rejected() -> None:
         ContractExtraction.model_validate(payload)
 
 
-def test_json_schema_serializes() -> None:
-    schema = ContractExtraction.model_json_schema()
+def test_stringly_typed_numbers_and_bools_are_rejected() -> None:
+    payload = _load(FIXTURES / "valid" / "nda_basic.json")
+    term = payload["term"]
+    assert isinstance(term, dict)
+    term["duration_months"] = "24"
+    term["auto_renew"] = "false"
+
+    with pytest.raises(ValidationError):
+        ContractExtraction.model_validate(payload)
+
+
+def test_perpetual_term_rejects_fixed_duration() -> None:
+    payload = _load(FIXTURES / "valid" / "perpetual_license.json")
+    term = payload["term"]
+    assert isinstance(term, dict)
+    term["duration_months"] = 12
+
+    with pytest.raises(ValidationError):
+        ContractExtraction.model_validate(payload)
+
+
+def test_renewal_notice_requires_auto_renew() -> None:
+    payload = _load(FIXTURES / "valid" / "nda_basic.json")
+    term = payload["term"]
+    assert isinstance(term, dict)
+    term["renewal_notice_days"] = 30
+
+    with pytest.raises(ValidationError):
+        ContractExtraction.model_validate(payload)
+
+
+def test_indemnification_rejects_multiple_cap_forms() -> None:
+    payload = _load(FIXTURES / "valid" / "msa_basic.json")
+    indemnification = payload["indemnification"]
+    assert isinstance(indemnification, dict)
+    indemnification["cap_usd"] = 1_000_000
+
+    with pytest.raises(ValidationError):
+        ContractExtraction.model_validate(payload)
+
+
+def test_json_schema_serializes_for_openai_strict_outputs() -> None:
+    schema = contract_extraction_json_schema()
 
     assert schema["type"] == "object"
     assert "parties" in schema["properties"]
     assert "dispute_resolution" in schema["properties"]
+    _assert_all_object_properties_required(schema)
+
+
+def _assert_all_object_properties_required(value: object) -> None:
+    if isinstance(value, dict):
+        properties = value.get("properties")
+        if isinstance(properties, dict):
+            assert set(value["required"]) == set(properties)
+        for child in value.values():
+            _assert_all_object_properties_required(child)
+    elif isinstance(value, list):
+        for child in value:
+            _assert_all_object_properties_required(child)

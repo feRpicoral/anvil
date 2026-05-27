@@ -124,6 +124,34 @@ def test_find_near_duplicate_groups_handles_prefix_truncation() -> None:
     assert groups == [{0, 1}]
 
 
+def test_find_near_duplicate_groups_keeps_transitive_matches_together() -> None:
+    a = "a" * 100
+    b = "a" * 95 + "b" * 5
+    c = "a" * 90 + "b" * 10
+
+    groups = find_near_duplicate_groups([a, b, c], threshold=0.92, prefix_chars=100)
+
+    assert groups == [{0, 1, 2}]
+
+
+def test_find_near_duplicate_groups_rejects_invalid_threshold() -> None:
+    try:
+        find_near_duplicate_groups(["alpha", "beta"], threshold=-0.1)
+    except ValueError as exc:
+        assert str(exc) == "threshold must be between 0 and 1"
+        return
+    raise AssertionError("negative duplicate threshold should fail")
+
+
+def test_find_near_duplicate_groups_rejects_empty_prefix() -> None:
+    try:
+        find_near_duplicate_groups(["alpha", "beta"], prefix_chars=0)
+    except ValueError as exc:
+        assert str(exc) == "prefix_chars must be positive"
+        return
+    raise AssertionError("empty duplicate prefix should fail")
+
+
 def test_curation_outcome_is_immutable() -> None:
     outcome = CurationOutcome(accepted=True)
 

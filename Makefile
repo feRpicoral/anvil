@@ -1,4 +1,4 @@
-.PHONY: help install lint format typecheck test check clean
+.PHONY: help install lint format format-check typecheck test check clean
 
 PYTHON := uv run python
 
@@ -8,9 +8,10 @@ help:
 	@echo "  install      Install dependencies via uv"
 	@echo "  lint         Ruff lint check"
 	@echo "  format       Ruff format (writes changes)"
+	@echo "  format-check Ruff format check"
 	@echo "  typecheck    mypy"
 	@echo "  test         pytest"
-	@echo "  check        lint + typecheck + test (mirrors CI)"
+	@echo "  check        lint + format-check + typecheck + test (mirrors CI)"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 	@echo ""
@@ -27,13 +28,16 @@ format:
 	uv run ruff format .
 	uv run ruff check --fix .
 
+format-check:
+	uv run ruff format --check .
+
 typecheck:
 	uv run mypy
 
 test:
 	uv run pytest
 
-check: lint typecheck test
+check: lint format-check typecheck test
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

@@ -86,6 +86,19 @@ files = ["anvil", "scripts", "tests"]
 module = "tests.*"
 disallow_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = [
+    "trl.*",
+    "peft.*",
+    "transformers.*",
+    "datasets.*",
+    "bitsandbytes.*",
+    "accelerate.*",
+    "unsloth.*",
+    "torch.*",
+]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --cov=anvil --cov=scripts --cov-report=term-missing --cov-report=xml"

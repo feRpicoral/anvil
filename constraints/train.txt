@@ -4,6 +4,21 @@
 # and linux/x86_64 in a single uv lock, so we install them out-of-band per
 # platform:
 #
-#   uv pip install -c constraints/train.txt <framework>
+#   M1 smoke (no CUDA, no bitsandbytes; LoRA in BF16):
+#     uv pip install -c constraints/train.txt \
+#         trl peft transformers accelerate datasets
 #
-# Mirrors the same pattern as Forge's constraints/serve.txt.
+#   Linux + CUDA (paid GPU; full QLoRA stack):
+#     uv pip install -c constraints/train.txt \
+#         unsloth trl peft transformers accelerate datasets bitsandbytes
+#
+# Ranges come from the compatibility matrix; refresh after the first
+# successful install on each platform.
+
+trl<1.0
+peft>=0.13,<0.20
+transformers>=4.50,<5.0
+accelerate>=1.0,<2.0
+datasets>=3.0,<4.0
+bitsandbytes>=0.43,<0.50
+unsloth>=2025.0

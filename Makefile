@@ -57,7 +57,7 @@ endif
 	$(PYTHON) -m scripts.split --input $(DATA_FULL_DIR)/curated.jsonl --output-dir $(DATA_FULL_DIR)
 
 train-smoke: data-smoke
-	$(PYTHON) -m scripts.train --config configs/train-smoke.toml --dry-run
+	$(PYTHON) -m scripts.train --config configs/train-smoke.toml
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

@@ -57,11 +57,31 @@ def test_run_dry_run_returns_zero(tmp_path: Path) -> None:
     assert rc == 0
 
 
-def test_run_real_path_raises_not_implemented(tmp_path: Path) -> None:
+def test_run_real_path_dispatches_to_trl_trainer(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, _smoke_config_body(tmp_path))
     args = argparse.Namespace(config=config_path, resume_from=None, dry_run=False)
 
-    with pytest.raises(NotImplementedError, match="follow-up"):
+    # CI doesn't install the TRL stack, so the lazy import raises ImportError
+    # with the canonical install hint. That confirms dispatch landed in the
+    # trl_trainer module rather than the old NotImplementedError stub.
+    with pytest.raises(ImportError, match=r"constraints/train\.txt"):
+        run(args)
+
+
+def test_run_unsloth_backend_raises_not_implemented(tmp_path: Path) -> None:
+    train_path = _write_smoke_dataset(tmp_path / "data" / "train.jsonl")
+    config_path = _write_config(
+        tmp_path,
+        f"""
+        base_model = "meta-llama/Llama-3.1-8B-Instruct"
+        backend = "unsloth"
+        output_dir = "{tmp_path / "outputs"}"
+        train_jsonl = "{train_path}"
+        """,
+    )
+    args = argparse.Namespace(config=config_path, resume_from=None, dry_run=False)
+
+    with pytest.raises(NotImplementedError, match="Unsloth"):
         run(args)
 
 

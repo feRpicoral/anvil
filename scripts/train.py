@@ -2,8 +2,8 @@
 
 Loads a `TrainingConfig` from TOML, validates input paths, and dispatches
 to the chosen backend driver. The drivers import their CUDA-coupled deps
-on demand; with `--dry-run` the CLI exercises everything except the model
-load so CI and Mac dev installs can still validate the config.
+on demand; with `--dry-run` the CLI validates local config/data wiring
+without loading a model.
 """
 
 from __future__ import annotations
@@ -52,8 +52,7 @@ def _print_summary(config: TrainingConfig, *, file: TextIO) -> None:
         file.write(f"  wandb: project={config.wandb_project} run={config.wandb_run_name}\n")
 
 
-def _run_training(config: TrainingConfig, resume_from: Path | None) -> int:
-    del resume_from  # consumed by the actual driver
+def _run_training(config: TrainingConfig, _resume_from: Path | None) -> int:
     raise NotImplementedError(
         f"Real {config.backend} training driver not yet wired; "
         f"the follow-up PR installs the TRL/Unsloth stack via constraints/train.txt. "

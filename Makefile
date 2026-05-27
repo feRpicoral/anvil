@@ -17,7 +17,7 @@ help:
 	@echo ""
 	@echo "  data-smoke   50-sample fixture-replay dataset; zero API spend"
 	@echo "  data-full    4000-sample paid dataset (requires CONFIRM_PAID=1 and OPENAI_API_KEY)"
-	@echo "  train-smoke  validate training config in dry-run (real driver lands next)"
+	@echo "  train-smoke  generate smoke data and validate training config in dry-run"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -56,7 +56,7 @@ endif
 	$(PYTHON) -m scripts.curate --input $(DATA_FULL_DIR)/raw_synthesis.jsonl --output $(DATA_FULL_DIR)/curated.jsonl
 	$(PYTHON) -m scripts.split --input $(DATA_FULL_DIR)/curated.jsonl --output-dir $(DATA_FULL_DIR)
 
-train-smoke:
+train-smoke: data-smoke
 	$(PYTHON) -m scripts.train --config configs/train-smoke.toml --dry-run
 
 clean:

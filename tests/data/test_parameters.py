@@ -70,6 +70,39 @@ def test_license_extras_carry_term_kind() -> None:
     assert params.extras["indemnification_cap"]
 
 
+@pytest.mark.parametrize("contract_type", ["nda", "msa"])
+def test_term_months_is_always_present_for_month_based_templates(
+    contract_type: ContractType,
+) -> None:
+    for index in range(200):
+        params = generate_parameters(contract_type, sample_index=index, base_seed=0)
+        assert params.term_months is not None
+
+
+def test_license_perpetual_term_has_consistent_fields() -> None:
+    for index in range(500):
+        params = generate_parameters("license", sample_index=index, base_seed=0)
+        assert params.extras is not None
+        if params.extras["term_kind"] == "perpetual":
+            assert params.term_months is None
+            assert params.extras["term_description"] == "perpetual, no fixed expiration"
+            return
+
+    raise AssertionError("expected a perpetual license term within sample window")
+
+
+def test_license_fixed_terms_have_consistent_fields() -> None:
+    for index in range(500):
+        params = generate_parameters("license", sample_index=index, base_seed=0)
+        assert params.extras is not None
+        if params.extras["term_kind"] != "perpetual":
+            assert params.term_months is not None
+            assert params.extras["term_description"] == f"{params.term_months} months"
+            return
+
+    raise AssertionError("expected a fixed license term within sample window")
+
+
 def test_effective_date_is_iso() -> None:
     params = generate_parameters("nda", sample_index=0, base_seed=0)
     year, month, day = params.effective_date.split("-")

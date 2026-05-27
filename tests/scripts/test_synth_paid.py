@@ -83,6 +83,17 @@ def test_load_config_rejects_non_positive_spend_cap(tmp_path: Path) -> None:
         load_config(config_path)
 
 
+@pytest.mark.parametrize("max_spend_usd", [float("nan"), float("inf")])
+def test_load_config_rejects_non_finite_spend_cap(
+    tmp_path: Path,
+    max_spend_usd: float,
+) -> None:
+    config_path = _write_paid_config(tmp_path, max_spend_usd=max_spend_usd)
+
+    with pytest.raises(ValueError, match="positive number"):
+        load_config(config_path)
+
+
 def test_load_config_allows_no_spend_cap(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -165,11 +176,12 @@ def test_synthesize_renders_prompts_via_parameters_factory() -> None:
 def test_synthesize_aborts_when_spend_cap_crossed() -> None:
     generator = _CountingGenerator(cost_usd=2.5)
 
-    with pytest.raises(BudgetExceededError, match="exceeds cap"):
+    with pytest.raises(BudgetExceededError, match="exceeds cap") as exc_info:
         asyncio.run(synthesize(generator, num_samples=10, base_seed=0, max_spend_usd=5.0))
 
     # Two calls succeed (totaling $5.00, equal to cap), the third pushes over.
     assert generator.calls == 3
+    assert len(exc_info.value.partial_results) == 3
 
 
 def test_synthesize_completes_when_under_cap() -> None:
@@ -189,3 +201,17 @@ def test_run_surfaces_budget_exceeded_error(tmp_path: Path) -> None:
         build.return_value = _CountingGenerator(cost_usd=0.5)
         with pytest.raises(BudgetExceededError):
             run(args)
+
+
+def test_run_persists_partial_results_when_budget_exceeded(tmp_path: Path) -> None:
+    config_path = _write_paid_config(tmp_path, max_spend_usd=1.0, num_samples=5)
+    args = argparse.Namespace(config=config_path)
+
+    with patch("scripts.synth.build_generator") as build:
+        build.return_value = _CountingGenerator(cost_usd=0.5)
+        with pytest.raises(BudgetExceededError):
+            run(args)
+
+    output = tmp_path / "out" / "raw_synthesis.jsonl"
+    rows = output.read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 3

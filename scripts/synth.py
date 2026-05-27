@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import dataclasses
 import json
+import math
 import sys
 import tomllib
 from collections.abc import Callable, Sequence
@@ -35,6 +36,10 @@ _RAW_SYNTHESIS_FILENAME = "raw_synthesis.jsonl"
 
 class BudgetExceededError(RuntimeError):
     """Raised when running spend crosses `max_spend_usd` mid-synthesis."""
+
+    def __init__(self, message: str, partial_results: Sequence[GenerationResult]) -> None:
+        super().__init__(message)
+        self.partial_results = tuple(partial_results)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -102,7 +107,7 @@ def _positive_float(value: object) -> float:
         raise ValueError("max_spend_usd must be a positive number")
     if isinstance(value, int | float):
         result = float(value)
-        if result <= 0:
+        if result <= 0 or not math.isfinite(result):
             raise ValueError("max_spend_usd must be a positive number")
         return result
     raise ValueError("max_spend_usd must be a positive number")
@@ -145,7 +150,8 @@ async def synthesize(
         if max_spend_usd is not None and total_cost > max_spend_usd:
             raise BudgetExceededError(
                 f"spend ${total_cost:.4f} exceeds cap ${max_spend_usd:.4f} "
-                f"after {len(results)} samples"
+                f"after {len(results)} samples",
+                results,
             )
     return results
 
@@ -173,7 +179,7 @@ def run(args: argparse.Namespace) -> int:
             )
         )
     except BudgetExceededError as exc:
-        # Persist whatever survived so the operator can audit before retrying.
+        write_raw_jsonl(exc.partial_results, output_path)
         print(f"synth: ABORT — {exc}", file=sys.stderr)
         raise
     write_raw_jsonl(results, output_path)

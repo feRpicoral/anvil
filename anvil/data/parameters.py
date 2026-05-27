@@ -93,7 +93,7 @@ _DISPUTE_FORUMS: Final[tuple[str, ...]] = (
     "mediation_then_arbitration",
 )
 
-_TERM_LENGTHS: Final[tuple[int | None, ...]] = (12, 24, 36, 48, 60, None)
+_TERM_LENGTHS: Final[tuple[int, ...]] = (12, 24, 36, 48, 60)
 
 _EDGE_CASES: Final[tuple[str, ...]] = (
     "none",
@@ -134,12 +134,11 @@ def generate_parameters(
     party_a_jurisdiction = rng.choice(_PARTY_JURISDICTIONS)
     party_b_jurisdiction = rng.choice(_PARTY_JURISDICTIONS)
     effective_date = _random_date(rng)
-    term_months = rng.choice(_TERM_LENGTHS)
     governing_law = rng.choice(_GOVERNING_LAW)
     dispute_forum = rng.choice(_DISPUTE_FORUMS)
     edge_case = rng.choice(_EDGE_CASES)
     clause_complexity: ClauseComplexity = rng.choice(CLAUSE_COMPLEXITIES)
-    extras = _contract_specific_extras(contract_type, rng)
+    term_months, extras = _contract_specific_terms_and_extras(contract_type, rng)
 
     return PromptParameters(
         contract_type=contract_type,
@@ -164,27 +163,40 @@ def _random_date(rng: random.Random) -> str:
     return f"{year}-{month:02d}-{day:02d}"
 
 
-def _contract_specific_extras(contract_type: ContractType, rng: random.Random) -> dict[str, str]:
+def _contract_specific_terms_and_extras(
+    contract_type: ContractType,
+    rng: random.Random,
+) -> tuple[int | None, dict[str, str]]:
     if contract_type == "nda":
-        return {"confidentiality_months": str(rng.choice(_NDA_CONFIDENTIALITY_MONTHS))}
+        return rng.choice(_TERM_LENGTHS), {
+            "confidentiality_months": str(rng.choice(_NDA_CONFIDENTIALITY_MONTHS))
+        }
     if contract_type == "msa":
         auto_renew = rng.choice((True, False))
-        return {
-            "auto_renew": "true" if auto_renew else "false",
-            "renewal_notice_days": str(rng.choice(_MSA_AUTO_RENEW_NOTICES))
-            if auto_renew
-            else "n/a",
-            "indemnification_cap": rng.choice(_INDEMNIFICATION_CAPS),
-        }
+        return (
+            rng.choice(_TERM_LENGTHS),
+            {
+                "auto_renew": "true" if auto_renew else "false",
+                "renewal_notice_days": str(rng.choice(_MSA_AUTO_RENEW_NOTICES))
+                if auto_renew
+                else "n/a",
+                "indemnification_cap": rng.choice(_INDEMNIFICATION_CAPS),
+            },
+        )
     if contract_type == "license":
         term_kind = rng.choice(_LICENSE_TERM_KINDS)
         if term_kind == "perpetual":
+            term_months = None
             term_description = "perpetual, no fixed expiration"
         else:
-            term_description = f"{rng.choice([12, 24, 36, 48, 60])} months"
-        return {
-            "term_kind": term_kind,
-            "term_description": term_description,
-            "indemnification_cap": rng.choice(_INDEMNIFICATION_CAPS),
-        }
+            term_months = rng.choice(_TERM_LENGTHS)
+            term_description = f"{term_months} months"
+        return (
+            term_months,
+            {
+                "term_kind": term_kind,
+                "term_description": term_description,
+                "indemnification_cap": rng.choice(_INDEMNIFICATION_CAPS),
+            },
+        )
     raise ValueError(f"unknown contract_type: {contract_type!r}")

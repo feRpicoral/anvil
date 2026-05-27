@@ -120,8 +120,8 @@ class TrainingConfig:
             raise ValueError("grad_accum must be >= 1")
         if not 0 <= self.warmup_ratio <= 1:
             raise ValueError("warmup_ratio must be in [0, 1]")
-        if self.weight_decay < 0:
-            raise ValueError("weight_decay must be >= 0")
+        if self.weight_decay < 0 or not math.isfinite(self.weight_decay):
+            raise ValueError("weight_decay must be a non-negative finite number")
         if self.max_seq_len < 1:
             raise ValueError("max_seq_len must be >= 1")
 
@@ -149,14 +149,14 @@ def load_config(path: Path) -> TrainingConfig:
     """Parse a TOML training config into a `TrainingConfig`."""
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     try:
-        base_model = str(raw["base_model"])
-        backend = str(raw["backend"])
-        output_dir = Path(str(raw["output_dir"]))
-        train_jsonl = Path(str(raw["train_jsonl"]))
+        base_model = _required_str(raw, "base_model")
+        backend = _required_str(raw, "backend")
+        output_dir = Path(_required_str(raw, "output_dir"))
+        train_jsonl = Path(_required_str(raw, "train_jsonl"))
     except KeyError as exc:
         raise ValueError(f"{path}: missing required key {exc}") from exc
 
-    val_jsonl = Path(str(raw["val_jsonl"])) if "val_jsonl" in raw else None
+    val_jsonl = Path(_required_str(raw, "val_jsonl")) if "val_jsonl" in raw else None
 
     fields = {
         "base_model": base_model,
@@ -171,6 +171,13 @@ def load_config(path: Path) -> TrainingConfig:
         return TrainingConfig(**fields)  # type: ignore[arg-type]
     except TypeError as exc:
         raise ValueError(f"{path}: invalid field — {exc}") from exc
+
+
+def _required_str(raw: dict[str, object], key: str) -> str:
+    value = raw[key]
+    if not isinstance(value, str):
+        raise ValueError(f"{key} must be a string")
+    return value
 
 
 def _optional_fields(raw: dict[str, object]) -> dict[str, object]:

@@ -56,6 +56,8 @@ def test_effective_batch_size_is_product() -> None:
         ("warmup_ratio", -0.1, "warmup_ratio"),
         ("warmup_ratio", 1.1, "warmup_ratio"),
         ("weight_decay", -0.01, "weight_decay"),
+        ("weight_decay", float("nan"), "weight_decay"),
+        ("weight_decay", float("inf"), "weight_decay"),
         ("max_seq_len", 0, "max_seq_len"),
         ("save_total_limit", 0, "save_total_limit"),
     ],
@@ -222,6 +224,40 @@ def test_load_config_rejects_wrong_field_type(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="epochs must be an integer"):
+        load_config(path)
+
+
+@pytest.mark.parametrize("field_name", ["base_model", "backend", "output_dir", "train_jsonl"])
+def test_load_config_rejects_wrong_required_field_type(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    values = {
+        "base_model": '"Qwen/Qwen2.5-0.5B-Instruct"',
+        "backend": '"trl"',
+        "output_dir": '"outputs/smoke"',
+        "train_jsonl": '"data/smoke/train.jsonl"',
+    }
+    values[field_name] = "123"
+    path = _write_config(tmp_path, "\n".join(f"{key} = {value}" for key, value in values.items()))
+
+    with pytest.raises(ValueError, match=f"{field_name} must be a string"):
+        load_config(path)
+
+
+def test_load_config_rejects_wrong_val_jsonl_type(tmp_path: Path) -> None:
+    path = _write_config(
+        tmp_path,
+        """
+        base_model = "Qwen/Qwen2.5-0.5B-Instruct"
+        backend = "trl"
+        output_dir = "outputs/smoke"
+        train_jsonl = "data/smoke/train.jsonl"
+        val_jsonl = false
+        """,
+    )
+
+    with pytest.raises(ValueError, match="val_jsonl must be a string"):
         load_config(path)
 
 

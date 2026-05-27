@@ -1,0 +1,39 @@
+{
+  "contract_type": "license",
+  "contract_text": "# Software License Agreement\n\nThis Software License Agreement (this \"Agreement\") is entered into as of April 1, 2026 between Vega Analytics, Inc., a Delaware corporation (\"Licensor\"), and Polaris Manufacturing Co., a New York corporation (\"Licensee\").\n\n## 1. Grant\nLicensor grants Licensee a non-exclusive, non-transferable license to use the Licensed Software for Licensee's internal manufacturing-analytics operations during the Term.\n\n## 2. Term\nThe initial term is twenty-four (24) months. This Agreement does not auto-renew; renewal requires a written extension signed by both parties.\n\n## 3. Confidentiality\nLicensee shall maintain the confidentiality of all algorithm specifications and benchmark results provided by Licensor. The confidentiality obligation survives for forty-eight (48) months following termination. Information that is publicly available or independently developed is excluded.\n\n## 4. Indemnification\nLicensor will indemnify Licensee against third-party claims that the Licensed Software infringes a United States patent or registered copyright. Licensor's liability under this Section is capped at one-and-one-half (1.5x) the License Fees paid during the twelve months preceding the claim.\n\n## 5. Termination\nEither party may terminate this Agreement for material breach with thirty (30) days' notice and a thirty (30) day cure period, or for insolvency.\n\n## 6. Governing Law and Venue\nThis Agreement is governed by the laws of the State of New York. The parties consent to the exclusive jurisdiction of the state and federal courts located in New York County, New York.",
+  "extraction": {
+    "parties": [
+      {"name": "Vega Analytics, Inc.", "role": "licensor"},
+      {"name": "Polaris Manufacturing Co.", "role": "licensee"}
+    ],
+    "effective_date": "2026-04-01",
+    "term": {
+      "duration_months": 24,
+      "is_perpetual": false,
+      "auto_renew": false,
+      "renewal_notice_days": null
+    },
+    "governing_law": "State of New York",
+    "jurisdiction": "state and federal courts located in New York County, New York",
+    "confidentiality": {
+      "scope": "Algorithm specifications and benchmark results provided by Licensor.",
+      "duration_months": 48,
+      "carveouts": ["publicly available information", "independently developed information"]
+    },
+    "termination": {
+      "triggers": ["material breach", "insolvency"],
+      "notice_days": 30,
+      "cure_period_days": 30
+    },
+    "indemnification": {
+      "scope": "Third-party claims that the Licensed Software infringes a US patent or registered copyright.",
+      "cap_usd": null,
+      "cap_multiplier": 1.5
+    },
+    "dispute_resolution": {
+      "forum": "litigation",
+      "venue": "New York County, New York",
+      "governing_rules": null
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "contract_type": "license",
+  "contract_text": "# Perpetual Software License Agreement\n\nThis Perpetual Software License Agreement is entered into between Lyra Technologies Ltd., a company incorporated in England and Wales (\"Licensor\"), and Orion Robotics, Inc., a Delaware corporation (\"Licensee\").\n\n## 1. License Grant\nLicensor grants Licensee a perpetual, worldwide, non-exclusive license to install, use, and reproduce the Licensed Software solely for Licensee's internal robotics research and product development.\n\n## 2. Term\nThis Agreement has no fixed end date and remains in effect in perpetuity, subject to termination under Section 4.\n\n## 3. Indemnification\nLicensor shall indemnify Licensee against third-party intellectual-property infringement claims arising from Licensee's use of the Licensed Software in accordance with this Agreement. Licensor's aggregate liability under this Section is capped at five million United States dollars ($5,000,000).\n\n## 4. Termination\nEither party may terminate this Agreement for material breach that remains uncured thirty (30) days after written notice.\n\n## 5. Governing Law and Disputes\nThis Agreement is governed by the laws of England and Wales. All disputes will be finally resolved by arbitration under the LCIA Arbitration Rules. The seat of arbitration is London.",
+  "extraction": {
+    "parties": [
+      {"name": "Lyra Technologies Ltd.", "role": "licensor"},
+      {"name": "Orion Robotics, Inc.", "role": "licensee"}
+    ],
+    "effective_date": null,
+    "term": {
+      "duration_months": null,
+      "is_perpetual": true,
+      "auto_renew": false,
+      "renewal_notice_days": null
+    },
+    "governing_law": "England and Wales",
+    "jurisdiction": null,
+    "confidentiality": null,
+    "termination": {
+      "triggers": ["material breach uncured for 30 days"],
+      "notice_days": null,
+      "cure_period_days": 30
+    },
+    "indemnification": {
+      "scope": "Licensor indemnifies Licensee against third-party IP claims.",
+      "cap_usd": 5000000,
+      "cap_multiplier": null
+    },
+    "dispute_resolution": {
+      "forum": "arbitration",
+      "venue": "London, United Kingdom",
+      "governing_rules": "LCIA Arbitration Rules"
+    }
+  }
+}

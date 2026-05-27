@@ -1,0 +1,39 @@
+{
+  "contract_type": "nda",
+  "contract_text": "# Mutual Non-Disclosure Agreement\n\nThis Mutual Non-Disclosure Agreement (the \"Agreement\") is entered into as of February 15, 2026 by and between Acme Corp., a Delaware corporation (the \"Disclosing Party\"), and Globex Industries LLC, a Delaware limited liability company (the \"Receiving Party\").\n\n## 1. Confidential Information\nEach Party may disclose to the other certain non-public technical and business information, whether disclosed in writing or orally. Such information shall be treated as Confidential Information.\n\n## 2. Term\nThis Agreement remains in effect for twenty-four (24) months. Confidentiality obligations survive for sixty (60) months from the date of disclosure.\n\n## 3. Carveouts\nConfidential Information does not include information that is publicly available, independently developed by the Receiving Party, or rightfully received from a third party without confidentiality obligation.\n\n## 4. Governing Law and Venue\nThis Agreement is governed by the laws of the State of Delaware. The parties consent to the exclusive jurisdiction of the state and federal courts of New Castle County, Delaware.\n\n## 5. Termination\nEither Party may terminate this Agreement for material breach upon thirty (30) days' written notice, subject to a fifteen (15) day cure period, or for convenience with similar notice.",
+  "extraction": {
+    "parties": [
+      {"name": "Acme Corp.", "role": "disclosing_party"},
+      {"name": "Globex Industries LLC", "role": "receiving_party"}
+    ],
+    "effective_date": "2026-02-15",
+    "term": {
+      "duration_months": 24,
+      "is_perpetual": false,
+      "auto_renew": false,
+      "renewal_notice_days": null
+    },
+    "governing_law": "State of Delaware",
+    "jurisdiction": "state and federal courts of New Castle County, Delaware",
+    "confidentiality": {
+      "scope": "All non-public technical and business information disclosed in writing or orally.",
+      "duration_months": 60,
+      "carveouts": [
+        "publicly available information",
+        "independently developed information",
+        "information received from a third party without confidentiality obligation"
+      ]
+    },
+    "termination": {
+      "triggers": ["material breach", "convenience with notice"],
+      "notice_days": 30,
+      "cure_period_days": 15
+    },
+    "indemnification": null,
+    "dispute_resolution": {
+      "forum": "litigation",
+      "venue": "Wilmington, Delaware",
+      "governing_rules": null
+    }
+  }
+}

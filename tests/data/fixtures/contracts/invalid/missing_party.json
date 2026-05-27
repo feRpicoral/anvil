@@ -1,0 +1,18 @@
+{
+  "parties": [
+    {"name": "Solo Co.", "role": "disclosing_party"}
+  ],
+  "effective_date": "2026-03-01",
+  "term": {
+    "duration_months": 12,
+    "is_perpetual": false,
+    "auto_renew": false,
+    "renewal_notice_days": null
+  },
+  "governing_law": "State of California",
+  "jurisdiction": null,
+  "confidentiality": null,
+  "termination": {"triggers": [], "notice_days": null, "cure_period_days": null},
+  "indemnification": null,
+  "dispute_resolution": {"forum": "litigation", "venue": null, "governing_rules": null}
+}

@@ -6,7 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 authors = [{ name = "Fernando Picoral", email = "fernandopicoral@gmail.com" }]
 license = { text = "MIT" }
-dependencies = []
+dependencies = [
+    "pydantic>=2.7,<3.0",
+    "rapidfuzz>=3.6,<4.0",
+]
 
 [build-system]
 requires = ["hatchling"]

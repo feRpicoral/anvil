@@ -1,0 +1,31 @@
+{
+  "parties": [
+    {"name": "Lyra Technologies Ltd.", "role": "licensor"},
+    {"name": "Orion Robotics, Inc.", "role": "licensee"}
+  ],
+  "effective_date": null,
+  "term": {
+    "duration_months": null,
+    "is_perpetual": true,
+    "auto_renew": false,
+    "renewal_notice_days": null
+  },
+  "governing_law": "England and Wales",
+  "jurisdiction": null,
+  "confidentiality": null,
+  "termination": {
+    "triggers": ["material breach uncured for 30 days"],
+    "notice_days": null,
+    "cure_period_days": 30
+  },
+  "indemnification": {
+    "scope": "Licensor indemnifies Licensee against third-party IP claims.",
+    "cap_usd": 5000000,
+    "cap_multiplier": null
+  },
+  "dispute_resolution": {
+    "forum": "arbitration",
+    "venue": "London, United Kingdom",
+    "governing_rules": "LCIA Arbitration Rules"
+  }
+}

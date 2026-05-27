@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from anvil.data.format import EXTRACTION_INSTRUCTION
 from anvil.eval.runner import Prediction
 
 _INSTALL_HINT = (
@@ -22,27 +23,17 @@ _INSTALL_HINT = (
     "  uv pip install -c constraints/train.txt transformers peft accelerate"
 )
 
-_SYSTEM_PROMPT = (
-    "You extract structured contract fields from legal documents. "
-    "Return a single JSON object that conforms exactly to the provided schema. "
-    "Use null where the contract does not specify a value. "
-    "Do not include any text outside the JSON object."
-)
-
 _KNOWN_DTYPES = ("bfloat16", "float16", "float32")
 
 
 def build_extraction_messages(contract_text: str) -> list[dict[str, str]]:
-    """Render the chat-format messages an extraction predictor sends."""
     return [
-        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "system", "content": EXTRACTION_INSTRUCTION},
         {"role": "user", "content": contract_text},
     ]
 
 
 class LocalExtractionPredictor:
-    """HF transformers + optional PEFT LoRA adapter predictor."""
-
     def __init__(
         self,
         *,
@@ -84,6 +75,14 @@ class LocalExtractionPredictor:
             raise ImportError(_INSTALL_HINT) from exc
 
         torch_dtype = _resolve_dtype(self._torch_dtype_str, torch)
+        peft_model: Any = None
+        if self._adapter_path is not None:
+            try:
+                from peft import PeftModel
+            except ImportError as exc:
+                raise ImportError(_INSTALL_HINT) from exc
+            peft_model = PeftModel
+
         tokenizer = AutoTokenizer.from_pretrained(self._base_model_name)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -92,12 +91,8 @@ class LocalExtractionPredictor:
             torch_dtype=torch_dtype,
             device_map=self._device_map,
         )
-        if self._adapter_path is not None:
-            try:
-                from peft import PeftModel
-            except ImportError as exc:
-                raise ImportError(_INSTALL_HINT) from exc
-            model = PeftModel.from_pretrained(model, str(self._adapter_path))
+        if peft_model is not None:
+            model = peft_model.from_pretrained(model, str(self._adapter_path))
         model.eval()
         self._tokenizer = tokenizer
         self._model = model

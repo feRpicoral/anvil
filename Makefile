@@ -1,7 +1,8 @@
-.PHONY: help install lint format format-check typecheck test check clean data-smoke
+.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full
 
 PYTHON := uv run python
 DATA_SMOKE_DIR := data/smoke
+DATA_FULL_DIR := data/full
 
 help:
 	@echo "Anvil — common tasks"
@@ -15,6 +16,7 @@ help:
 	@echo "  check        lint + format-check + typecheck + test (mirrors CI)"
 	@echo ""
 	@echo "  data-smoke   50-sample fixture-replay dataset; zero API spend"
+	@echo "  data-full    4000-sample paid dataset (requires CONFIRM_PAID=1 and OPENAI_API_KEY)"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -43,6 +45,15 @@ data-smoke:
 	$(PYTHON) -m scripts.synth --config configs/data-smoke.toml
 	$(PYTHON) -m scripts.curate --input $(DATA_SMOKE_DIR)/raw_synthesis.jsonl --output $(DATA_SMOKE_DIR)/curated.jsonl --no-dedup
 	$(PYTHON) -m scripts.split --input $(DATA_SMOKE_DIR)/curated.jsonl --output-dir $(DATA_SMOKE_DIR) --allow-overlap
+
+data-full:
+ifneq ($(CONFIRM_PAID),1)
+	@echo "data-full is a paid run. Re-invoke with CONFIRM_PAID=1 to proceed."
+	@exit 1
+endif
+	$(PYTHON) -m scripts.synth --config configs/data-full.toml
+	$(PYTHON) -m scripts.curate --input $(DATA_FULL_DIR)/raw_synthesis.jsonl --output $(DATA_FULL_DIR)/curated.jsonl
+	$(PYTHON) -m scripts.split --input $(DATA_FULL_DIR)/curated.jsonl --output-dir $(DATA_FULL_DIR)
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

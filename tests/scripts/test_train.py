@@ -68,7 +68,7 @@ def test_run_real_path_dispatches_to_trl_trainer(tmp_path: Path) -> None:
         run(args)
 
 
-def test_run_unsloth_backend_raises_not_implemented(tmp_path: Path) -> None:
+def test_run_unsloth_backend_dispatches_to_unsloth_trainer(tmp_path: Path) -> None:
     train_path = _write_smoke_dataset(tmp_path / "data" / "train.jsonl")
     config_path = _write_config(
         tmp_path,
@@ -81,7 +81,10 @@ def test_run_unsloth_backend_raises_not_implemented(tmp_path: Path) -> None:
     )
     args = argparse.Namespace(config=config_path, resume_from=None, dry_run=False)
 
-    with pytest.raises(NotImplementedError, match="Unsloth"):
+    # CI doesn't install Unsloth, so the lazy import raises ImportError with
+    # the canonical install hint. That confirms dispatch landed in the
+    # unsloth_trainer module rather than the old NotImplementedError stub.
+    with pytest.raises(ImportError, match=r"constraints/train\.txt"):
         run(args)
 
 

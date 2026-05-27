@@ -1,0 +1,40 @@
+# Paid training config: Unsloth + Llama 3.1 8B Instruct + NF4 + 3 epochs.
+#
+# Target: RunPod RTX 4090 24 GB Community ($0.34/hr). Requires the full
+# Linux + CUDA training stack via constraints/train.txt and HF_TOKEN with
+# Llama gating granted. Triggered via:
+#
+#   make train-full CONFIRM_PAID=1
+#
+# Assumes `make data-full CONFIRM_PAID=1` has already produced
+# data/full/{train,val}.jsonl.
+base_model = "meta-llama/Llama-3.1-8B-Instruct"
+backend = "unsloth"
+output_dir = "outputs/full"
+train_jsonl = "data/full/train.jsonl"
+val_jsonl = "data/full/val.jsonl"
+
+rank = 16
+alpha = 32
+lora_dropout = 0.05
+target_modules = "all_linear"
+quantization = "nf4"
+
+learning_rate = 2.0e-4
+epochs = 3
+batch_size = 4
+grad_accum = 4
+warmup_ratio = 0.03
+weight_decay = 0.0
+max_seq_len = 2048
+seed = 42
+
+eval_strategy = "steps"
+eval_steps = 50
+save_strategy = "steps"
+save_steps = 100
+save_total_limit = 2
+keep_best_only = true
+
+wandb_project = "anvil"
+wandb_run_name = "llama31-8b-qlora-v1"

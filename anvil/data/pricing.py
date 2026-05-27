@@ -14,6 +14,7 @@ PricePair = tuple[float, float]
 OPENAI_PRICES: Final[dict[str, PricePair]] = {
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-2024-08-06": (2.50, 10.00),
+    "gpt-4o-mini": (0.15, 0.60),
     "gpt-4.1": (2.00, 8.00),
 }
 

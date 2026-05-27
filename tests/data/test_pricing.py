@@ -32,6 +32,7 @@ def test_compute_cost_usd_rejects_negative() -> None:
 
 def test_openai_pricing_table_has_gpt4o_snapshot() -> None:
     assert OPENAI_PRICES["gpt-4o-2024-08-06"] == (2.50, 10.00)
+    assert OPENAI_PRICES["gpt-4o-mini"] == (0.15, 0.60)
 
 
 def test_anthropic_pricing_table_has_sonnet_and_haiku() -> None:

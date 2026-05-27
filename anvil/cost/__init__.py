@@ -1,1 +1,1 @@
-"""Training and inference cost model. Inference half is vendored from Forge."""
+"""Training and inference cost model."""

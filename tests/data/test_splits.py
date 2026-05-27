@@ -68,7 +68,7 @@ def test_split_records_partitions_at_default_ratios() -> None:
 
 
 def test_split_records_keeps_each_contract_type_represented() -> None:
-    records = _make_records({"nda": 20, "msa": 20, "license": 20})
+    records = _make_records({"nda": 5, "msa": 5, "license": 5})
 
     splits = split_records(records, seed=0)
 
@@ -111,6 +111,16 @@ def test_split_records_rejects_negative_ratios() -> None:
 
     with pytest.raises(ValueError, match="non-negative"):
         split_records(records, ratios=(1.2, -0.1, -0.1))
+
+
+def test_split_records_rejects_wrong_ratio_count() -> None:
+    records = _make_records({"nda": 4})
+
+    with pytest.raises(ValueError, match="exactly three"):
+        split_records(records, ratios=(0.8, 0.2))
+
+    with pytest.raises(ValueError, match="exactly three"):
+        split_records(records, ratios=(0.8, 0.1, 0.1, 0.0))
 
 
 def test_verify_no_overlap_raises_when_record_duplicated() -> None:
@@ -159,11 +169,16 @@ def test_splits_counts_helper() -> None:
     assert splits.counts() == {"train": 1, "val": 1, "test": 0}
 
 
-def test_split_records_does_not_overshoot_small_buckets() -> None:
-    # A 2-sample bucket with default ratios rounds to (2, 0, 0); we should
-    # not crash or duplicate, even if val/test end up empty for that type.
+def test_split_records_rejects_buckets_too_small_for_nonzero_splits() -> None:
     records = _make_records({"nda": 2})
 
-    splits = split_records(records)
+    with pytest.raises(ValueError, match="not enough records"):
+        split_records(records)
 
-    assert len(_all_records(splits)) == 2
+
+def test_split_records_allows_small_buckets_when_only_two_splits_are_nonzero() -> None:
+    records = _make_records({"nda": 2})
+
+    splits = split_records(records, ratios=(0.5, 0.5, 0.0))
+
+    assert splits.counts() == {"train": 1, "val": 1, "test": 0}

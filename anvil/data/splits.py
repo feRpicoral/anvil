@@ -50,7 +50,7 @@ def normalized_text_hash(text: str) -> str:
 
 def split_records(
     records: Sequence[GenerationResult],
-    ratios: tuple[float, float, float] = _DEFAULT_RATIOS,
+    ratios: tuple[float, ...] = _DEFAULT_RATIOS,
     seed: int = 0,
 ) -> Splits:
     """Stratified shuffle-then-slice split by contract_type.
@@ -76,11 +76,7 @@ def split_records(
         bucket = list(by_type[contract_type])
         rng.shuffle(bucket)
         n = len(bucket)
-        n_train = round(ratios[0] * n)
-        n_val = round(ratios[1] * n)
-        # Anything left over goes to test so we never overshoot the bucket.
-        n_train = min(n_train, n)
-        n_val = min(n_val, n - n_train)
+        n_train, n_val, _n_test = _allocate_counts(n, ratios)
         train.extend(bucket[:n_train])
         val.extend(bucket[n_train : n_train + n_val])
         test.extend(bucket[n_train + n_val :])
@@ -110,9 +106,27 @@ def _hash_set(records: Iterable[GenerationResult]) -> set[str]:
     return {normalized_text_hash(record.contract_text) for record in records}
 
 
-def _validate_ratios(ratios: tuple[float, float, float]) -> None:
+def _validate_ratios(ratios: tuple[float, ...]) -> None:
+    if len(ratios) != 3:
+        raise ValueError("split ratios must contain exactly three values")
     if any(r < 0 for r in ratios):
         raise ValueError("split ratios must be non-negative")
     total = sum(ratios)
     if not abs(total - 1.0) < 1e-6:
         raise ValueError(f"split ratios must sum to 1.0 (got {total})")
+
+
+def _allocate_counts(n: int, ratios: tuple[float, ...]) -> tuple[int, int, int]:
+    positive_indices = [index for index, ratio in enumerate(ratios) if ratio > 0]
+    if n < len(positive_indices):
+        raise ValueError(
+            f"not enough records ({n}) to populate {len(positive_indices)} non-zero splits"
+        )
+
+    targets = [ratio * n for ratio in ratios]
+    counts = [1 if index in positive_indices else 0 for index in range(3)]
+    remaining = n - sum(counts)
+    for _ in range(remaining):
+        index = max(range(3), key=lambda i: (targets[i] - counts[i], ratios[i], -i))
+        counts[index] += 1
+    return counts[0], counts[1], counts[2]

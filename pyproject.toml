@@ -78,7 +78,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
-files = ["anvil", "tests"]
+files = ["anvil", "scripts", "tests"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -86,14 +86,14 @@ disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=anvil --cov-report=term-missing --cov-report=xml"
+addopts = "-v --cov=anvil --cov=scripts --cov-report=term-missing --cov-report=xml"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.coverage.run]
 branch = true
-source = ["anvil"]
+source = ["anvil", "scripts"]
 
 [tool.coverage.report]
 exclude_lines = [

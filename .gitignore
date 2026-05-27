@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+wheels/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Ruff
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Hugging Face cache
+.cache/
+hf_cache/
+
+# Training artefacts (root-anchored)
+/outputs/
+/checkpoints/
+/runs/
+/wandb/
+
+# Datasets (synthesized locally, not committed). Root-anchored so the
+# anvil/data/ package directory is unaffected.
+/data/
+
+# Models (never commit weights or adapters from local runs). Root-anchored.
+/models/
+/adapters/
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.ckpt
+
+# Committed results live in results/, but intermediate scratch doesn't
+results/scratch/
+results/eval/smoke/
+results/train/smoke/
+
+# Local logs (root-anchored)
+/logs/
+
+# Working notes — explicitly NOT in repo per CLAUDE.md
+DECISIONS_WORK.md

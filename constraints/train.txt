@@ -1,0 +1,12 @@
+# Training stack constraints — populated in Phase 2.
+#
+# These pins are CUDA-coupled and don't resolve cleanly across darwin/arm64
+# and linux/x86_64 in a single uv lock, so we install them out-of-band per
+# platform:
+#
+#   uv pip install -c constraints/train.txt <framework>
+#
+# Mirrors the same pattern as Forge's constraints/serve.txt. The exact pin
+# set is decided in Phase 2 after framework selection (Unsloth vs. Axolotl
+# vs. TRL SFTTrainer) and validated against the compatibility matrix in
+# DECISIONS.md.

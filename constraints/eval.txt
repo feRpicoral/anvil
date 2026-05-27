@@ -1,0 +1,7 @@
+# Eval-time constraints — populated in Phase 5.
+#
+# Minimal set: OpenAI / Anthropic clients for the big-model baseline + LLM-
+# as-judge, plus a structured-output validator for JSON-validity scoring.
+# vLLM is only invoked transiently for the paid eval run (to serve the
+# fine-tuned model for batch inference) and is installed at that point
+# using Forge's constraints/serve.txt.

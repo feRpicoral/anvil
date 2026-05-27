@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -97,6 +98,14 @@ def test_fixture_predictor_raises_for_missing_prediction() -> None:
         asyncio.run(predictor.predict(case.contract_text))
 
 
+def test_fixture_predictor_rejects_duplicate_contract_text() -> None:
+    cases = [_case("c0", contract_text="same text"), _case("c1", contract_text="same text")]
+    predictor = FixturePredictor({"c0": _prediction(), "c1": _prediction()})
+
+    with pytest.raises(ValueError, match="duplicate contract_text"):
+        predictor.attach_cases(cases)
+
+
 def test_run_variant_returns_one_output_per_case() -> None:
     cases = [_case("c0"), _case("c1"), _case("c2")]
     predictor = FixturePredictor(
@@ -116,6 +125,16 @@ def test_run_variant_returns_one_output_per_case() -> None:
         assert output.parsed is not None
         assert output.parse_reason is None
         assert output.latency_ms >= 0
+
+
+def test_run_variant_accepts_one_shot_case_iterables() -> None:
+    cases = [_case("c0"), _case("c1")]
+    predictor = FixturePredictor({case.case_id: _prediction() for case in cases})
+
+    outputs = asyncio.run(run_variant(predictor, (case for case in cases), variant="base"))
+
+    assert len(outputs) == 2
+    assert {output.case_id for output in outputs} == {"c0", "c1"}
 
 
 def test_run_variant_parses_valid_payload() -> None:
@@ -158,6 +177,14 @@ def test_summarize_variant_empty_outputs_returns_zeros() -> None:
     assert summary.field_scores == {}
 
 
+def test_summarize_variant_empty_outputs_keeps_case_count() -> None:
+    summary = summarize_variant([], [_case("c0"), _case("c1")])
+
+    assert summary.n_cases == 2
+    assert summary.json_validity_rate == 0.0
+    assert summary.mean_latency_ms == 0.0
+
+
 def test_summarize_variant_perfect_predictions_score_one() -> None:
     cases = [_case(f"c{i}") for i in range(3)]
     predictor = FixturePredictor({c.case_id: _prediction() for c in cases})
@@ -186,7 +213,19 @@ def test_summarize_variant_partial_invalidity_lowers_rate() -> None:
     summary = summarize_variant(outputs, cases)
 
     assert summary.json_validity_rate == 0.5
-    assert summary.field_scores  # only computed over valid outputs
+    assert summary.field_scores
+
+
+def test_summarize_variant_counts_missing_outputs_as_invalid() -> None:
+    cases = [_case("c0"), _case("c1")]
+    predictor = FixturePredictor({"c0": _prediction()})
+
+    outputs = asyncio.run(run_variant(predictor, [cases[0]], variant="base"))
+    summary = summarize_variant(outputs, cases)
+
+    assert summary.n_cases == 2
+    assert summary.json_validity_rate == 0.5
+    assert summary.mean_latency_ms == pytest.approx(outputs[0].latency_ms)
 
 
 def test_summarize_variant_raises_when_gold_missing_for_a_valid_output() -> None:
@@ -194,9 +233,32 @@ def test_summarize_variant_raises_when_gold_missing_for_a_valid_output() -> None
     predictor = FixturePredictor({"c0": _prediction()})
 
     outputs = asyncio.run(run_variant(predictor, cases, variant="base"))
-    # Strip the case from the lookup the summarizer relies on.
     with pytest.raises(KeyError, match="gold extraction"):
         summarize_variant(outputs, cases=[])
+
+
+def test_summarize_variant_rejects_duplicate_case_ids() -> None:
+    with pytest.raises(ValueError, match="duplicate case_id"):
+        summarize_variant([], [_case("c0"), _case("c0")])
+
+
+def test_summarize_variant_rejects_duplicate_outputs() -> None:
+    cases = [_case("c0")]
+    predictor = FixturePredictor({"c0": _prediction()})
+
+    output = asyncio.run(run_variant(predictor, cases, variant="base"))[0]
+    with pytest.raises(ValueError, match="duplicate output"):
+        summarize_variant([output, output], cases)
+
+
+def test_summarize_variant_rejects_mixed_variants() -> None:
+    cases = [_case("c0"), _case("c1")]
+    predictor = FixturePredictor({"c0": _prediction()})
+
+    output = asyncio.run(run_variant(predictor, [cases[0]], variant="base"))[0]
+    outputs = [output, replace(output, case_id="c1", variant="gpt-4o")]
+    with pytest.raises(ValueError, match="mixed variants"):
+        summarize_variant(outputs, cases)
 
 
 def test_summarize_variant_aggregates_costs_and_latency() -> None:

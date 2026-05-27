@@ -1,13 +1,4 @@
-"""Three-way eval runner: base / fine-tuned / GPT-4o.
-
-Each variant implements the `ExtractionPredictor` Protocol and runs over
-the same `EvalCase` list. Per-case raw output, parsed extraction, and
-accounting metadata (tokens, cost, latency) are captured in
-`VariantOutput`. The aggregator then produces per-field means plus the
-JSON-validity rate for the variant. Real predictors land in a follow-up;
-this module ships the orchestration + a `FixturePredictor` that replays
-canned outputs so the runner is exercised in CI.
-"""
+"""Evaluation runner shared by local, fine-tuned, and hosted predictors."""
 
 from __future__ import annotations
 
@@ -27,8 +18,6 @@ from anvil.eval.metrics import (
 
 @dataclass(frozen=True)
 class EvalCase:
-    """A single held-out test case."""
-
     case_id: str
     contract_text: str
     gold_extraction: ContractExtraction
@@ -36,8 +25,6 @@ class EvalCase:
 
 @dataclass(frozen=True)
 class Prediction:
-    """The result of one predictor call."""
-
     raw_output: str
     input_tokens: int = 0
     output_tokens: int = 0
@@ -46,8 +33,6 @@ class Prediction:
 
 @dataclass(frozen=True)
 class VariantOutput:
-    """One variant's prediction for one case, plus parsing outcome."""
-
     case_id: str
     variant: str
     raw_output: str
@@ -61,15 +46,11 @@ class VariantOutput:
 
 @runtime_checkable
 class ExtractionPredictor(Protocol):
-    """Anything that maps a contract_text to a Prediction."""
-
     async def predict(self, contract_text: str) -> Prediction: ...
 
 
 @dataclass(frozen=True)
 class VariantSummary:
-    """Aggregate scores + cost for a variant across all cases."""
-
     variant: str
     n_cases: int
     json_validity_rate: float
@@ -91,13 +72,16 @@ class FixturePredictor:
     def __init__(self, predictions_by_case_id: dict[str, Prediction]) -> None:
         if not predictions_by_case_id:
             raise ValueError("FixturePredictor needs at least one prediction")
-        self._by_id = predictions_by_case_id
+        self._by_id = dict(predictions_by_case_id)
         self._lookup: dict[str, str] = {}
 
     def attach_cases(self, cases: Iterable[EvalCase]) -> None:
-        """Associate `contract_text` with `case_id` so `predict` can dispatch."""
+        lookup: dict[str, str] = {}
         for case in cases:
-            self._lookup[case.contract_text] = case.case_id
+            if case.contract_text in lookup:
+                raise ValueError(f"duplicate contract_text for case_id={case.case_id!r}")
+            lookup[case.contract_text] = case.case_id
+        self._lookup = lookup
 
     async def predict(self, contract_text: str) -> Prediction:
         case_id = self._lookup.get(contract_text)
@@ -116,11 +100,11 @@ async def run_variant(
     cases: Iterable[EvalCase],
     variant: str,
 ) -> list[VariantOutput]:
-    """Run `predictor` over each case and capture parsing + accounting."""
+    case_list = list(cases)
     if isinstance(predictor, FixturePredictor):
-        predictor.attach_cases(cases)
+        predictor.attach_cases(case_list)
     outputs: list[VariantOutput] = []
-    for case in cases:
+    for case in case_list:
         start = time.perf_counter()
         prediction = await predictor.predict(case.contract_text)
         elapsed_ms = (time.perf_counter() - start) * 1000
@@ -145,16 +129,34 @@ async def run_variant(
 
 
 def summarize_variant(outputs: list[VariantOutput], cases: list[EvalCase]) -> VariantSummary:
-    """Aggregate per-case outputs into a `VariantSummary`.
+    """Aggregate outputs for one variant.
 
-    Per-field means are computed over PARSED outputs only (a case whose
-    JSON didn't parse is excluded from per-field stats but counted in
-    the validity rate, which is over ALL cases).
+    JSON validity is measured against the full case set; missing outputs
+    count as invalid. Field scores only use parsed outputs.
     """
+    gold_by_case_id: dict[str, ContractExtraction] = {}
+    for case in cases:
+        if case.case_id in gold_by_case_id:
+            raise ValueError(f"duplicate case_id={case.case_id!r}")
+        gold_by_case_id[case.case_id] = case.gold_extraction
+
+    variants = {output.variant for output in outputs}
+    if len(variants) > 1:
+        raise ValueError(f"cannot summarize mixed variants: {sorted(variants)}")
+
+    output_case_ids: set[str] = set()
+    for output in outputs:
+        if output.case_id in output_case_ids:
+            raise ValueError(f"duplicate output for case_id={output.case_id!r}")
+        output_case_ids.add(output.case_id)
+        if output.case_id not in gold_by_case_id:
+            raise KeyError(f"no gold extraction for case_id={output.case_id!r}")
+
+    n_cases = len(cases)
     if not outputs:
         return VariantSummary(
             variant="",
-            n_cases=0,
+            n_cases=n_cases,
             json_validity_rate=0.0,
             field_scores={},
             total_input_tokens=0,
@@ -163,17 +165,12 @@ def summarize_variant(outputs: list[VariantOutput], cases: list[EvalCase]) -> Va
             mean_latency_ms=0.0,
         )
     variant = outputs[0].variant
-    n_cases = len(outputs)
     valid_outputs = [o for o in outputs if o.parsed is not None]
-    validity_rate = len(valid_outputs) / n_cases
-    gold_by_case_id = {c.case_id: c.gold_extraction for c in cases}
+    validity_rate = len(valid_outputs) / n_cases if n_cases > 0 else 0.0
     per_case_scores: list[dict[str, float]] = []
     for output in valid_outputs:
-        gold = gold_by_case_id.get(output.case_id)
-        if gold is None:
-            raise KeyError(f"no gold extraction for case_id={output.case_id!r}")
         assert output.parsed is not None
-        per_case_scores.append(score_extraction(output.parsed, gold))
+        per_case_scores.append(score_extraction(output.parsed, gold_by_case_id[output.case_id]))
     field_scores = aggregate_scores(per_case_scores)
     return VariantSummary(
         variant=variant,
@@ -183,5 +180,5 @@ def summarize_variant(outputs: list[VariantOutput], cases: list[EvalCase]) -> Va
         total_input_tokens=sum(o.input_tokens for o in outputs),
         total_output_tokens=sum(o.output_tokens for o in outputs),
         total_cost_usd=sum(o.cost_usd for o in outputs),
-        mean_latency_ms=sum(o.latency_ms for o in outputs) / n_cases,
+        mean_latency_ms=sum(o.latency_ms for o in outputs) / len(outputs),
     )

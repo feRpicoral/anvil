@@ -52,12 +52,17 @@ def split_records(
     records: Sequence[GenerationResult],
     ratios: tuple[float, ...] = _DEFAULT_RATIOS,
     seed: int = 0,
+    verify: bool = True,
 ) -> Splits:
     """Stratified shuffle-then-slice split by contract_type.
 
     Stratification keeps each contract type proportionally represented in
     train/val/test so a smoke eval doesn't accidentally hold out an entire
     class. Ratios sum to 1.0; the validator rejects any other input.
+
+    `verify=False` skips the contamination guard. The smoke pipeline uses
+    that path because fixture replay intentionally repeats canonical
+    contracts; every real run keeps the default.
     """
     _validate_ratios(ratios)
     if not records:
@@ -82,7 +87,8 @@ def split_records(
         test.extend(bucket[n_train + n_val :])
 
     splits = Splits(train=tuple(train), val=tuple(val), test=tuple(test))
-    verify_no_overlap(splits)
+    if verify:
+        verify_no_overlap(splits)
     return splits
 
 

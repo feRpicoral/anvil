@@ -1,0 +1,6 @@
+# Smoke synthesis config: 50 fixture-replayed samples, zero API spend.
+backend = "fixture"
+fixtures_dir = "tests/data/fixtures/synthesis"
+num_samples = 50
+output_dir = "data/smoke"
+seed = 0

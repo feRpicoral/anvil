@@ -36,8 +36,7 @@ class TrainingCost:
             ("synthesis_api_cost_usd", self.synthesis_api_cost_usd),
             ("eval_api_cost_usd", self.eval_api_cost_usd),
         ):
-            if value < 0 or not math.isfinite(value):
-                raise ValueError(f"{name} must be a non-negative finite number, got {value}")
+            _validate_non_negative_finite(name, value)
 
     @property
     def gpu_cost_usd(self) -> float:
@@ -56,3 +55,10 @@ class TrainingCost:
             "eval_api_cost_usd": self.eval_api_cost_usd,
             "total_usd": self.total_usd,
         }
+
+
+def _validate_non_negative_finite(name: str, value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a non-negative finite number, got {value!r}")
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative finite number, got {value}")

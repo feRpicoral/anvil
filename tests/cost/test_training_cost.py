@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import pytest
 
@@ -51,6 +52,19 @@ def test_rejects_invalid_field_values(field_name: str, bad_value: float) -> None
     kwargs[field_name] = bad_value
 
     with pytest.raises(ValueError, match=field_name):
+        TrainingCost(**kwargs)
+
+
+@pytest.mark.parametrize("bad_value", ["4", True])
+def test_rejects_wrong_field_types(bad_value: Any) -> None:
+    kwargs: dict[str, Any] = {
+        "gpu_hours": bad_value,
+        "gpu_hourly_usd": 0.69,
+        "synthesis_api_cost_usd": 10.0,
+        "eval_api_cost_usd": 5.0,
+    }
+
+    with pytest.raises(ValueError, match="gpu_hours"):
         TrainingCost(**kwargs)
 
 

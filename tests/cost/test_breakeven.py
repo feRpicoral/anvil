@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 import pytest
 
 from anvil.cost.breakeven import (
     BreakevenPoint,
     cumulative_cost_curve,
-    monthly_breakeven_tokens,
+    monthly_breakeven_m_tokens,
 )
 
 
 def test_breakeven_known_value() -> None:
-    # $120 training, $0.10/1M fine-tuned, $6/1M API blended, 12-month horizon.
-    # amortized = 120 / 12 = $10 per month.
-    # X = 10 / (6 - 0.10) = 10 / 5.9 ≈ 1.6949 million tokens/month.
-    volume = monthly_breakeven_tokens(
+    volume = monthly_breakeven_m_tokens(
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
@@ -26,10 +24,10 @@ def test_breakeven_known_value() -> None:
 
 
 def test_breakeven_scales_linearly_with_training_cost() -> None:
-    half = monthly_breakeven_tokens(
+    half = monthly_breakeven_m_tokens(
         training_cost_usd=60.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=6.0
     )
-    full = monthly_breakeven_tokens(
+    full = monthly_breakeven_m_tokens(
         training_cost_usd=120.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=6.0
     )
 
@@ -37,13 +35,13 @@ def test_breakeven_scales_linearly_with_training_cost() -> None:
 
 
 def test_breakeven_scales_inversely_with_horizon() -> None:
-    short = monthly_breakeven_tokens(
+    short = monthly_breakeven_m_tokens(
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
         months_horizon=6,
     )
-    long = monthly_breakeven_tokens(
+    long = monthly_breakeven_m_tokens(
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
@@ -54,10 +52,10 @@ def test_breakeven_scales_inversely_with_horizon() -> None:
 
 
 def test_breakeven_widens_with_smaller_api_premium() -> None:
-    big_premium = monthly_breakeven_tokens(
+    big_premium = monthly_breakeven_m_tokens(
         training_cost_usd=120.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=10.0
     )
-    small_premium = monthly_breakeven_tokens(
+    small_premium = monthly_breakeven_m_tokens(
         training_cost_usd=120.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=1.0
     )
 
@@ -66,7 +64,7 @@ def test_breakeven_widens_with_smaller_api_premium() -> None:
 
 def test_breakeven_rejects_api_cost_not_above_fine_tuned() -> None:
     with pytest.raises(ValueError, match="strictly less"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=120.0,
             fine_tuned_usd_per_1m=10.0,
             api_usd_per_1m=10.0,
@@ -75,7 +73,7 @@ def test_breakeven_rejects_api_cost_not_above_fine_tuned() -> None:
 
 def test_breakeven_rejects_zero_horizon() -> None:
     with pytest.raises(ValueError, match="months_horizon"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=120.0,
             fine_tuned_usd_per_1m=0.10,
             api_usd_per_1m=6.0,
@@ -83,31 +81,54 @@ def test_breakeven_rejects_zero_horizon() -> None:
         )
 
 
+def test_breakeven_rejects_non_integer_horizon() -> None:
+    months_horizon: Any = 1.5
+
+    with pytest.raises(ValueError, match="months_horizon"):
+        monthly_breakeven_m_tokens(
+            training_cost_usd=120.0,
+            fine_tuned_usd_per_1m=0.10,
+            api_usd_per_1m=6.0,
+            months_horizon=months_horizon,
+        )
+
+
 def test_breakeven_rejects_negative_training_cost() -> None:
     with pytest.raises(ValueError, match="training_cost_usd"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=-1.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=6.0
         )
 
 
 def test_breakeven_rejects_negative_fine_tuned_cost() -> None:
     with pytest.raises(ValueError, match="fine_tuned_usd_per_1m"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=120.0, fine_tuned_usd_per_1m=-0.01, api_usd_per_1m=6.0
         )
 
 
 def test_breakeven_rejects_non_finite_api_cost() -> None:
     with pytest.raises(ValueError, match="api_usd_per_1m"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=120.0, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=math.inf
         )
 
 
 def test_breakeven_rejects_nan_training_cost() -> None:
     with pytest.raises(ValueError, match="training_cost_usd"):
-        monthly_breakeven_tokens(
+        monthly_breakeven_m_tokens(
             training_cost_usd=math.nan, fine_tuned_usd_per_1m=0.10, api_usd_per_1m=6.0
+        )
+
+
+def test_breakeven_rejects_wrong_numeric_type() -> None:
+    training_cost_usd: Any = "120"
+
+    with pytest.raises(ValueError, match="training_cost_usd"):
+        monthly_breakeven_m_tokens(
+            training_cost_usd=training_cost_usd,
+            fine_tuned_usd_per_1m=0.10,
+            api_usd_per_1m=6.0,
         )
 
 
@@ -140,8 +161,7 @@ def test_cumulative_cost_curve_length_matches_horizon_plus_one() -> None:
 
 
 def test_cumulative_cost_curve_at_breakeven_volume_crosses_at_horizon() -> None:
-    # Pick the volume that breaks even exactly at the horizon.
-    volume = monthly_breakeven_tokens(
+    volume = monthly_breakeven_m_tokens(
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
@@ -160,7 +180,7 @@ def test_cumulative_cost_curve_at_breakeven_volume_crosses_at_horizon() -> None:
 
 
 def test_cumulative_cost_curve_below_breakeven_stays_finetuned_more_expensive() -> None:
-    volume = monthly_breakeven_tokens(
+    volume = monthly_breakeven_m_tokens(
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
@@ -170,7 +190,7 @@ def test_cumulative_cost_curve_below_breakeven_stays_finetuned_more_expensive() 
         training_cost_usd=120.0,
         fine_tuned_usd_per_1m=0.10,
         api_usd_per_1m=6.0,
-        monthly_volume_m_tokens=volume / 2,  # half the breakeven volume
+        monthly_volume_m_tokens=volume / 2,
         months_horizon=6,
     )
     final = curve[-1]
@@ -185,4 +205,16 @@ def test_cumulative_cost_curve_rejects_negative_volume() -> None:
             fine_tuned_usd_per_1m=0.10,
             api_usd_per_1m=6.0,
             monthly_volume_m_tokens=-1.0,
+        )
+
+
+def test_cumulative_cost_curve_rejects_wrong_volume_type() -> None:
+    monthly_volume_m_tokens: Any = "2"
+
+    with pytest.raises(ValueError, match="monthly_volume_m_tokens"):
+        cumulative_cost_curve(
+            training_cost_usd=120.0,
+            fine_tuned_usd_per_1m=0.10,
+            api_usd_per_1m=6.0,
+            monthly_volume_m_tokens=monthly_volume_m_tokens,
         )

@@ -52,6 +52,21 @@ def test_load_config_rejects_missing_key(tmp_path: Path) -> None:
         load_config(path)
 
 
+@pytest.mark.parametrize("num_samples", ["0", "-1", "false"])
+def test_load_config_rejects_invalid_num_samples(tmp_path: Path, num_samples: str) -> None:
+    path = tmp_path / "bad.toml"
+    path.write_text(
+        'backend = "fixture"\n'
+        f'fixtures_dir = "{FIXTURES_DIR}"\n'
+        f"num_samples = {num_samples}\n"
+        f'output_dir = "{tmp_path / "out"}"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="num_samples must be a positive integer"):
+        load_config(path)
+
+
 def test_build_generator_rejects_unknown_backend() -> None:
     config = SynthConfig(
         backend="unsupported",

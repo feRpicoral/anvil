@@ -37,7 +37,7 @@ def load_config(path: Path) -> SynthConfig:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     try:
         backend = str(raw["backend"])
-        num_samples = int(raw["num_samples"])
+        num_samples = _positive_int(raw["num_samples"], "num_samples")
         output_dir = Path(str(raw["output_dir"]))
         seed = int(raw.get("seed", 0))
     except KeyError as exc:
@@ -59,6 +59,14 @@ def build_generator(config: SynthConfig) -> StructuredGenerator:
             raise ValueError("fixture backend requires fixtures_dir")
         return FixtureGenerator(config.fixtures_dir)
     raise ValueError(f"unsupported backend: {config.backend!r}")
+
+
+def _positive_int(value: object, key: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{key} must be a positive integer")
+    if value <= 0:
+        raise ValueError(f"{key} must be a positive integer")
+    return value
 
 
 async def synthesize(

@@ -26,11 +26,9 @@ from pydantic import ValidationError
 from anvil.data.schema import (
     Confidentiality,
     ContractExtraction,
-    DisputeResolution,
     Indemnification,
     Party,
     Term,
-    Termination,
 )
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -93,10 +91,17 @@ def score_extraction(
         "termination_notice_days": _exact(
             predicted.termination.notice_days, gold.termination.notice_days
         ),
+        "termination_cure_period_days": _exact(
+            predicted.termination.cure_period_days, gold.termination.cure_period_days
+        ),
         "indemnification": _indemnification_score(predicted.indemnification, gold.indemnification),
         "dispute_forum": _exact(predicted.dispute_resolution.forum, gold.dispute_resolution.forum),
         "dispute_venue": _normalized_exact(
             predicted.dispute_resolution.venue, gold.dispute_resolution.venue
+        ),
+        "dispute_governing_rules": _normalized_exact(
+            predicted.dispute_resolution.governing_rules,
+            gold.dispute_resolution.governing_rules,
         ),
     }
 
@@ -121,7 +126,9 @@ def aggregate_scores(per_sample: list[dict[str, float]]) -> dict[str, float]:
     for scores in per_sample:
         fields.update(scores.keys())
     n = len(per_sample)
-    return {field: sum(scores.get(field, 0.0) for scores in per_sample) / n for field in fields}
+    return {
+        field: sum(scores.get(field, 0.0) for scores in per_sample) / n for field in sorted(fields)
+    }
 
 
 def _normalize(value: str | None) -> str:
@@ -143,6 +150,10 @@ def _exact(predicted: Any, gold: Any) -> float:
 
 
 def _normalized_exact(predicted: str | None, gold: str | None) -> float:
+    if predicted is None and gold is None:
+        return 1.0
+    if predicted is None or gold is None:
+        return 0.0
     return 1.0 if _normalize(predicted) == _normalize(gold) else 0.0
 
 
@@ -177,12 +188,13 @@ def _confidentiality_score(
         return 1.0
     if predicted is None or gold is None:
         return 0.0
+    scope_match = _normalized_exact(predicted.scope, gold.scope)
     duration_match = predicted.duration_months == gold.duration_months
     carveouts_f1 = _set_f1(
         _normalized_set(predicted.carveouts),
         _normalized_set(gold.carveouts),
     )
-    return (duration_match + carveouts_f1) / 2
+    return (scope_match + duration_match + carveouts_f1) / 3
 
 
 def _indemnification_score(
@@ -193,26 +205,7 @@ def _indemnification_score(
         return 1.0
     if predicted is None or gold is None:
         return 0.0
+    scope_match = _normalized_exact(predicted.scope, gold.scope)
     usd_match = predicted.cap_usd == gold.cap_usd
     multiplier_match = predicted.cap_multiplier == gold.cap_multiplier
-    return (usd_match + multiplier_match) / 2
-
-
-def _dispute_score(
-    predicted: DisputeResolution,
-    gold: DisputeResolution,
-) -> float:
-    forum_match = predicted.forum == gold.forum
-    venue_match = _normalized_exact(predicted.venue, gold.venue)
-    rules_match = _normalized_exact(predicted.governing_rules, gold.governing_rules)
-    return (forum_match + venue_match + rules_match) / 3
-
-
-def _termination_score(
-    predicted: Termination,
-    gold: Termination,
-) -> float:
-    triggers_f1 = _set_f1(_normalized_set(predicted.triggers), _normalized_set(gold.triggers))
-    notice_match = predicted.notice_days == gold.notice_days
-    cure_match = predicted.cure_period_days == gold.cure_period_days
-    return (triggers_f1 + notice_match + cure_match) / 3
+    return (scope_match + usd_match + multiplier_match) / 3

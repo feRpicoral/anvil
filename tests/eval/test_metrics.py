@@ -80,7 +80,7 @@ def test_validate_json_output_rejects_non_object() -> None:
 
 def test_validate_json_output_rejects_schema_violation() -> None:
     payload = _minimal_payload()
-    payload["parties"] = [payload["parties"][0]]  # one party = invalid (min_length=2)
+    payload["parties"] = [payload["parties"][0]]
     outcome = validate_json_output(json.dumps(payload))
 
     assert outcome.valid is False
@@ -108,6 +108,26 @@ def test_score_extraction_identical_inputs_score_one() -> None:
 
     for field, score in scores.items():
         assert score == 1.0, f"{field} should be 1.0 on identity, got {score}"
+
+
+def test_score_extraction_returns_all_scored_fields() -> None:
+    scores = score_extraction(_build(_minimal_payload()), _build(_minimal_payload()))
+
+    assert set(scores) == {
+        "parties",
+        "effective_date",
+        "term",
+        "governing_law",
+        "jurisdiction",
+        "confidentiality",
+        "termination_triggers",
+        "termination_notice_days",
+        "termination_cure_period_days",
+        "indemnification",
+        "dispute_forum",
+        "dispute_venue",
+        "dispute_governing_rules",
+    }
 
 
 def test_score_extraction_party_role_mismatch_drops_parties() -> None:
@@ -146,7 +166,7 @@ def test_score_extraction_effective_date_uses_exact_match() -> None:
 def test_score_extraction_term_partial_credit() -> None:
     payload = _minimal_payload()
     near = _minimal_payload()
-    near["term"]["duration_months"] = 36  # one of four fields wrong
+    near["term"]["duration_months"] = 36
 
     scores = score_extraction(_build(payload), _build(near))
 
@@ -164,8 +184,18 @@ def test_score_extraction_termination_triggers_set_f1() -> None:
     assert scores["termination_triggers"] == 0.5
 
 
+def test_score_extraction_termination_cure_period_exact_match() -> None:
+    payload = _minimal_payload()
+    other = _minimal_payload()
+    other["termination"]["cure_period_days"] = 30
+
+    scores = score_extraction(_build(payload), _build(other))
+
+    assert scores["termination_cure_period_days"] == 0.0
+
+
 def test_score_extraction_handles_null_confidentiality() -> None:
-    payload = _minimal_payload()  # confidentiality=None
+    payload = _minimal_payload()
     matching = _minimal_payload()
 
     scores = score_extraction(_build(payload), _build(matching))
@@ -187,6 +217,44 @@ def test_score_extraction_penalizes_missing_optional_block() -> None:
     assert scores["confidentiality"] == 0.0
 
 
+def test_score_extraction_confidentiality_scope_contributes_to_score() -> None:
+    payload = _minimal_payload()
+    payload["confidentiality"] = {
+        "scope": "All proprietary information.",
+        "duration_months": 60,
+        "carveouts": ["public domain"],
+    }
+    other = _minimal_payload()
+    other["confidentiality"] = {
+        "scope": "Only technical information.",
+        "duration_months": 60,
+        "carveouts": ["public domain"],
+    }
+
+    scores = score_extraction(_build(payload), _build(other))
+
+    assert scores["confidentiality"] == 2 / 3
+
+
+def test_score_extraction_indemnification_scope_contributes_to_score() -> None:
+    payload = _minimal_payload()
+    payload["indemnification"] = {
+        "scope": "Third-party IP claims.",
+        "cap_usd": 100000,
+        "cap_multiplier": None,
+    }
+    other = _minimal_payload()
+    other["indemnification"] = {
+        "scope": "Any and all losses.",
+        "cap_usd": 100000,
+        "cap_multiplier": None,
+    }
+
+    scores = score_extraction(_build(payload), _build(other))
+
+    assert scores["indemnification"] == 2 / 3
+
+
 def test_score_extraction_governing_law_normalization() -> None:
     payload = _minimal_payload()
     payload["governing_law"] = "  delaware  "
@@ -205,6 +273,16 @@ def test_score_extraction_jurisdiction_none_matches_none() -> None:
     scores = score_extraction(_build(payload), _build(same))
 
     assert scores["jurisdiction"] == 1.0
+
+
+def test_score_extraction_empty_string_does_not_match_null() -> None:
+    payload = _minimal_payload()
+    payload["jurisdiction"] = ""
+    same = _minimal_payload()
+
+    scores = score_extraction(_build(payload), _build(same))
+
+    assert scores["jurisdiction"] == 0.0
 
 
 def test_macro_average_empty_returns_zero() -> None:
@@ -266,8 +344,18 @@ def test_score_extraction_dispute_venue_normalized() -> None:
     assert scores["dispute_venue"] == 1.0
 
 
+def test_score_extraction_dispute_governing_rules_normalized() -> None:
+    payload = _minimal_payload()
+    payload["dispute_resolution"]["governing_rules"] = "AAA Commercial Rules"
+    other = _minimal_payload()
+    other["dispute_resolution"]["governing_rules"] = " aaa   commercial rules "
+
+    scores = score_extraction(_build(payload), _build(other))
+
+    assert scores["dispute_governing_rules"] == 1.0
+
+
 def test_can_construct_extraction_directly() -> None:
-    """Sanity: a hand-built ContractExtraction round-trips through score_extraction."""
     extraction = ContractExtraction(
         parties=[
             Party(name="Acme", role="disclosing_party"),

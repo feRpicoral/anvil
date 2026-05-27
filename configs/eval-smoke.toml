@@ -1,0 +1,17 @@
+test_jsonl = "tests/data/fixtures/eval/test_cases.jsonl"
+output_dir = "results/eval/smoke"
+
+[[variant]]
+name = "base"
+predictor = "fixture"
+fixtures_path = "tests/data/fixtures/eval/predictions_invalid.jsonl"
+
+[[variant]]
+name = "finetuned"
+predictor = "fixture"
+fixtures_path = "tests/data/fixtures/eval/predictions_perfect.jsonl"
+
+[[variant]]
+name = "gpt-4o"
+predictor = "fixture"
+fixtures_path = "tests/data/fixtures/eval/predictions_perfect.jsonl"

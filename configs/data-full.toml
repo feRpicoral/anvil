@@ -1,0 +1,14 @@
+# Paid synthesis config: 4000 GPT-4o samples with structured outputs.
+#
+# Hard caps:
+#   - max_spend_usd: $55 (matches the synthesis line in the budget envelope).
+#   - num_samples: 4000.
+#
+# Requires OPENAI_API_KEY in the environment. Triggered via:
+#   make data-full CONFIRM_PAID=1
+backend = "openai"
+model = "gpt-4o-2024-08-06"
+num_samples = 4000
+max_spend_usd = 55.0
+output_dir = "data/full"
+seed = 0

@@ -50,6 +50,12 @@ def _write_config(tmp_path: Path, body: str) -> Path:
     return path
 
 
+def _write_eval_payload(tmp_path: Path, payload: object) -> Path:
+    path = tmp_path / "comparison.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
 def _smoke_body(tmp_path: Path) -> str:
     return f"""
 output_path = "{tmp_path / "cost.json"}"
@@ -117,13 +123,82 @@ def test_load_cost_config_rejects_empty_api_keys(tmp_path: Path) -> None:
         load_cost_config(config_path)
 
 
+@pytest.mark.parametrize(
+    ("api_keys", "match"),
+    [
+        ('api_keys = "gpt-4o"', "api_keys"),
+        ("api_keys = [123]", r"api_keys\[0\]"),
+    ],
+)
+def test_load_cost_config_rejects_malformed_api_keys(
+    tmp_path: Path, api_keys: str, match: str
+) -> None:
+    body = _smoke_body(tmp_path).replace(
+        'api_keys = ["gpt-4o", "claude-sonnet-4-6"]',
+        api_keys,
+    )
+    config_path = _write_config(tmp_path, body)
+
+    with pytest.raises(ValueError, match=match):
+        load_cost_config(config_path)
+
+
+def test_load_cost_config_rejects_non_string_output_path(tmp_path: Path) -> None:
+    body = _smoke_body(tmp_path).replace(
+        f'output_path = "{tmp_path / "cost.json"}"',
+        "output_path = 123",
+    )
+    config_path = _write_config(tmp_path, body)
+
+    with pytest.raises(ValueError, match="output_path"):
+        load_cost_config(config_path)
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "match"),
+    [
+        ("gpu_hours = 4.0", 'gpu_hours = "4"', "training.gpu_hours"),
+        ("throughput_tps = 1100.0", 'throughput_tps = "1100"', "fine_tuned.throughput_tps"),
+        ("input_share = 0.5", "input_share = true", "input_share"),
+        ("months_horizon = 12", "months_horizon = 1.5", "months_horizon"),
+        ("months_horizon = 12", "months_horizon = 0", r"months_horizon.*>= 1"),
+    ],
+)
+def test_load_cost_config_rejects_malformed_numeric_fields(
+    tmp_path: Path, old: str, new: str, match: str
+) -> None:
+    body = _smoke_body(tmp_path).replace(old, new)
+    config_path = _write_config(tmp_path, body)
+
+    with pytest.raises(ValueError, match=match):
+        load_cost_config(config_path)
+
+
 def test_fold_eval_api_cost_sums_variants(tmp_path: Path) -> None:
-    path = tmp_path / "comparison.json"
-    path.write_text(json.dumps(_eval_comparison_payload(total_cost_usd=6.50)), encoding="utf-8")
+    path = _write_eval_payload(tmp_path, _eval_comparison_payload(total_cost_usd=6.50))
 
     total = fold_eval_api_cost(path)
 
     assert total == pytest.approx(6.50)
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        ([], "comparison payload must be an object"),
+        ({"variants": {}}, "variants must be a list"),
+        ({"variants": [1]}, r"variants\[0\] must be an object"),
+        ({"variants": [{"total_cost_usd": -0.01}]}, r"variants\[0\]\.total_cost_usd"),
+        ({"variants": [{"total_cost_usd": "1.25"}]}, r"variants\[0\]\.total_cost_usd"),
+    ],
+)
+def test_fold_eval_api_cost_rejects_malformed_payload(
+    tmp_path: Path, payload: object, match: str
+) -> None:
+    path = _write_eval_payload(tmp_path, payload)
+
+    with pytest.raises(ValueError, match=match):
+        fold_eval_api_cost(path)
 
 
 def test_build_report_produces_expected_top_level_keys(tmp_path: Path) -> None:
@@ -150,12 +225,7 @@ def test_build_report_breakeven_curve_length_matches_horizon(tmp_path: Path) -> 
 
 
 def test_build_report_includes_eval_api_cost_when_provided(tmp_path: Path) -> None:
-    eval_path = tmp_path / "comparison.json"
-    eval_path.write_text(
-        json.dumps(_eval_comparison_payload(total_cost_usd=6.50)), encoding="utf-8"
-    )
-    # eval_comparison_path is a top-level key — declare it BEFORE any TOML
-    # table or it becomes a sub-key of the previous table.
+    eval_path = _write_eval_payload(tmp_path, _eval_comparison_payload(total_cost_usd=6.50))
     body = _smoke_body(tmp_path).replace(
         'api_keys = ["gpt-4o", "claude-sonnet-4-6"]',
         f'eval_comparison_path = "{eval_path}"\napi_keys = ["gpt-4o", "claude-sonnet-4-6"]',
@@ -165,13 +235,10 @@ def test_build_report_includes_eval_api_cost_when_provided(tmp_path: Path) -> No
 
     report = build_report(config)
 
-    # Training-cost eval_api_cost was 0; eval comparison contributed 6.50.
     assert report["training_cost"]["eval_api_cost_usd"] == pytest.approx(6.50)
 
 
 def test_build_report_breakeven_volume_matches_hand_computed(tmp_path: Path) -> None:
-    # Configure cheap fine-tuned + expensive API + known training cost so the
-    # breakeven number is computable from the public formula.
     body = """
 output_path = "/tmp/ignored.json"
 api_keys = ["gpt-4o"]
@@ -193,11 +260,13 @@ utilization = 1.0
 """
     config_path = _write_config(tmp_path, body)
     config = load_cost_config(config_path)
+
     report = build_report(config)
 
-    # Training total = $120, fine_tuned per-1M ≈ 0, gpt-4o blended = $6.25/1M.
-    # Breakeven = (120/12) / (6.25 - 0) = 1.6.
-    assert report["breakeven"]["monthly_volume_m_tokens"] == pytest.approx(1.6, abs=1e-3)
+    expected = (120.0 / 12.0) / (
+        report["breakeven"]["primary_api_usd_per_1m"] - report["fine_tuned"]["usd_per_1m_tokens"]
+    )
+    assert report["breakeven"]["monthly_volume_m_tokens"] == pytest.approx(expected)
 
 
 def test_run_writes_output_json(tmp_path: Path) -> None:

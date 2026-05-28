@@ -7,7 +7,7 @@ and the API baselines to compare against. Optionally folds in eval
 spend reported in an `eval/comparison.json` so the cost numbers match
 the exact variants the README shows.
 
-Output: `results/cost/comparison.json` — the single payload the chart
+Output: `results/cost/comparison.json`, the single payload the chart
 pipeline consumes.
 """
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import math
 import sys
 import tomllib
 from collections.abc import Sequence
@@ -53,23 +54,21 @@ class CostConfig:
 def load_cost_config(path: Path) -> CostConfig:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
     try:
-        output_path = Path(str(raw["output_path"]))
-        training = raw["training"]
-        fine_tuned = raw["fine_tuned"]
-        api_keys = tuple(str(k) for k in raw["api_keys"])
+        output_path = _required_path(raw, "output_path", path)
+        training = _required_table(raw, "training", path)
+        fine_tuned = _required_table(raw, "fine_tuned", path)
+        api_keys = _required_str_tuple(raw, "api_keys", path)
     except KeyError as exc:
         raise ValueError(f"{path}: missing required key {exc}") from exc
 
-    if not isinstance(training, dict) or not isinstance(fine_tuned, dict):
-        raise ValueError(f"{path}: 'training' and 'fine_tuned' must be tables")
     if not api_keys:
         raise ValueError(f"{path}: 'api_keys' must be a non-empty list")
 
-    training_tier_key = str(training["gpu_tier_key"])
+    training_tier_key = _required_str(training, "gpu_tier_key", path, "training.gpu_tier_key")
     if training_tier_key not in GPU_TIERS:
         raise ValueError(f"{path}: unknown training gpu_tier_key {training_tier_key!r}")
 
-    fine_tuned_tier_key = str(fine_tuned["gpu_tier_key"])
+    fine_tuned_tier_key = _required_str(fine_tuned, "gpu_tier_key", path, "fine_tuned.gpu_tier_key")
     if fine_tuned_tier_key not in GPU_TIERS:
         raise ValueError(f"{path}: unknown fine_tuned gpu_tier_key {fine_tuned_tier_key!r}")
 
@@ -79,33 +78,49 @@ def load_cost_config(path: Path) -> CostConfig:
 
     return CostConfig(
         output_path=output_path,
-        training_gpu_hours=float(training["gpu_hours"]),
+        training_gpu_hours=_required_number(training, "gpu_hours", path, "training.gpu_hours"),
         training_gpu_tier_key=training_tier_key,
-        synthesis_api_cost_usd=float(training.get("synthesis_api_cost_usd", 0.0)),
-        eval_api_cost_usd=float(training.get("eval_api_cost_usd", 0.0)),
-        fine_tuned_label=str(fine_tuned["label"]),
+        synthesis_api_cost_usd=_optional_number(
+            training, "synthesis_api_cost_usd", path, "training.synthesis_api_cost_usd", 0.0
+        ),
+        eval_api_cost_usd=_optional_number(
+            training, "eval_api_cost_usd", path, "training.eval_api_cost_usd", 0.0
+        ),
+        fine_tuned_label=_required_str(fine_tuned, "label", path, "fine_tuned.label"),
         fine_tuned_gpu_tier_key=fine_tuned_tier_key,
-        fine_tuned_throughput_tps=float(fine_tuned["throughput_tps"]),
-        fine_tuned_throughput_source=str(fine_tuned["throughput_source"]),
-        fine_tuned_utilization=float(fine_tuned.get("utilization", 1.0)),
+        fine_tuned_throughput_tps=_required_number(
+            fine_tuned, "throughput_tps", path, "fine_tuned.throughput_tps"
+        ),
+        fine_tuned_throughput_source=_required_str(
+            fine_tuned, "throughput_source", path, "fine_tuned.throughput_source"
+        ),
+        fine_tuned_utilization=_optional_number(
+            fine_tuned, "utilization", path, "fine_tuned.utilization", 1.0
+        ),
         api_keys=api_keys,
-        input_share=float(raw.get("input_share", 0.5)),
-        months_horizon=int(raw.get("months_horizon", 12)),
-        eval_comparison_path=Path(str(raw["eval_comparison_path"]))
-        if "eval_comparison_path" in raw
-        else None,
+        input_share=_optional_number(raw, "input_share", path, "input_share", 0.5),
+        months_horizon=_optional_int(raw, "months_horizon", path, "months_horizon", 12),
+        eval_comparison_path=_optional_path(raw, "eval_comparison_path", path),
     )
 
 
 def fold_eval_api_cost(eval_comparison_path: Path) -> float:
-    """Sum `total_cost_usd` across the variants in an eval comparison JSON.
-
-    Lets the cost report match the EXACT spend the eval reported, instead of
-    relying on the operator to copy the number into the TOML.
-    """
     payload = json.loads(eval_comparison_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{eval_comparison_path}: comparison payload must be an object")
     variants = payload.get("variants", [])
-    return sum(float(v.get("total_cost_usd", 0.0)) for v in variants)
+    if not isinstance(variants, list):
+        raise ValueError(f"{eval_comparison_path}: variants must be a list")
+
+    total = 0.0
+    for index, variant in enumerate(variants):
+        if not isinstance(variant, dict):
+            raise ValueError(f"{eval_comparison_path}: variants[{index}] must be an object")
+        total += _non_negative_finite(
+            variant.get("total_cost_usd", 0.0),
+            f"{eval_comparison_path}: variants[{index}].total_cost_usd",
+        )
+    return total
 
 
 def build_report(config: CostConfig) -> dict[str, Any]:
@@ -178,7 +193,7 @@ def run(args: argparse.Namespace) -> int:
         f"cost: total_training=${report['training_cost']['total_usd']:.2f} "
         f"self_hosted_per_1m=${report['fine_tuned']['usd_per_1m_tokens']:.4f} "
         f"breakeven={report['breakeven']['monthly_volume_m_tokens']:.2f}M tokens/month "
-        f"→ {config.output_path}",
+        f"-> {config.output_path}",
         file=sys.stderr,
     )
     return 0
@@ -192,6 +207,88 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main() -> int:
     return run(parse_args())
+
+
+def _required_table(mapping: dict[str, Any], key: str, path: Path) -> dict[str, Any]:
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {key}")
+    value = mapping[key]
+    if not isinstance(value, dict):
+        raise ValueError(f"{path}: {key!r} must be a table")
+    return value
+
+
+def _required_str(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> str:
+    label = display_key or key
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {label}")
+    value = mapping[key]
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{path}: {label} must be a non-empty string")
+    return value
+
+
+def _required_str_tuple(mapping: dict[str, Any], key: str, path: Path) -> tuple[str, ...]:
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {key}")
+    value = mapping[key]
+    if not isinstance(value, list):
+        raise ValueError(f"{path}: {key!r} must be a list of non-empty strings")
+    items: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item:
+            raise ValueError(f"{path}: {key}[{index}] must be a non-empty string")
+        items.append(item)
+    return tuple(items)
+
+
+def _required_path(mapping: dict[str, Any], key: str, path: Path) -> Path:
+    return Path(_required_str(mapping, key, path))
+
+
+def _optional_path(mapping: dict[str, Any], key: str, path: Path) -> Path | None:
+    if key not in mapping:
+        return None
+    return _required_path(mapping, key, path)
+
+
+def _required_number(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> float:
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {display_key or key}")
+    return _non_negative_finite(mapping[key], f"{path}: {display_key or key}")
+
+
+def _optional_number(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str, default: float
+) -> float:
+    if key not in mapping:
+        return default
+    return _required_number(mapping, key, path, display_key)
+
+
+def _optional_int(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str, default: int
+) -> int:
+    if key not in mapping:
+        return default
+    value = mapping[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{path}: {display_key} must be an integer")
+    if value < 1:
+        raise ValueError(f"{path}: {display_key} must be an integer >= 1")
+    return value
+
+
+def _non_negative_finite(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError(f"{label} must be a non-negative finite number")
+    if value < 0:
+        raise ValueError(f"{label} must be a non-negative finite number")
+    return float(value)
 
 
 if __name__ == "__main__":

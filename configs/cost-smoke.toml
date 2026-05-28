@@ -1,6 +1,3 @@
-# Cost smoke: a representative cost-report run that doesn't depend on a paid
-# training/eval pass. Uses plausible-but-pinned numbers so the chart pipeline
-# can be exercised end-to-end. Refresh after each paid run.
 output_path = "results/cost/smoke.json"
 eval_comparison_path = "results/eval/smoke/comparison.json"
 

@@ -37,6 +37,29 @@ def test_upload_adapter_rejects_path_traversal(tmp_path: Path) -> None:
         upload_adapter(adapter_dir, repo_id="../outside/model")
 
 
+@pytest.mark.parametrize(
+    "repo_id",
+    [
+        "acme/model--x",
+        "acme/model..x",
+        "acme/-model",
+        "acme/model-",
+        "acme/.model",
+        "acme/model.git",
+        f"acme/{'x' * 97}",
+    ],
+)
+def test_upload_adapter_rejects_huggingface_invalid_repo_ids(
+    tmp_path: Path,
+    repo_id: str,
+) -> None:
+    adapter_dir = tmp_path / "adapter"
+    adapter_dir.mkdir()
+
+    with pytest.raises(ValueError, match="repo_id"):
+        upload_adapter(adapter_dir, repo_id=repo_id)
+
+
 def test_upload_adapter_calls_create_repo_then_upload(tmp_path: Path) -> None:
     adapter_dir = tmp_path / "adapter"
     adapter_dir.mkdir()

@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from huggingface_hub import HfApi
+from huggingface_hub.errors import HFValidationError
+from huggingface_hub.utils import validate_repo_id  # type: ignore[attr-defined]
 
 
 def upload_adapter(
@@ -47,15 +49,10 @@ def upload_adapter(
 
 
 def _is_safe_repo_id(repo_id: str) -> bool:
-    if "/" not in repo_id:
+    if repo_id.count("/") != 1:
         return False
-    parts = repo_id.split("/")
-    if len(parts) != 2:
+    try:
+        validate_repo_id(repo_id)
+    except HFValidationError:
         return False
-    owner, name = parts
-    if not owner or not name:
-        return False
-    forbidden = {".", "..", ""}
-    if owner in forbidden or name in forbidden:
-        return False
-    return all(c.isalnum() or c in "-_." for c in owner + name)
+    return True

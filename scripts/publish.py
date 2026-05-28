@@ -13,10 +13,12 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import math
 import sys
 import tomllib
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast
 
 from anvil.publish.model_card import (
     CostSummary,
@@ -49,43 +51,22 @@ class PublishConfig:
 
 def load_publish_config(path: Path) -> PublishConfig:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
-    try:
-        adapter_dir = Path(str(raw["adapter_dir"]))
-        repo_id = str(raw["repo_id"])
-        model_name = str(raw["model_name"])
-        license_name = str(raw["license"])
-        language = str(raw.get("language", "en"))
-        task_name = str(raw["task_name"])
-        task_description = str(raw["task_description"])
-        training_data_description = str(raw["training_data_description"])
-        training_framework = str(raw["training_framework"])
-        training_config_path = Path(str(raw["training_config_path"]))
-    except KeyError as exc:
-        raise ValueError(f"{path}: missing required key {exc}") from exc
-
-    eval_comparison_path = (
-        Path(str(raw["eval_comparison_path"])) if "eval_comparison_path" in raw else None
-    )
-    cost_report_path = Path(str(raw["cost_report_path"])) if "cost_report_path" in raw else None
-    sources = tuple(str(s) for s in raw.get("sources", []))
-    tags = tuple(str(t) for t in raw.get("tags", []))
-    private = bool(raw.get("private", False))
     return PublishConfig(
-        adapter_dir=adapter_dir,
-        repo_id=repo_id,
-        model_name=model_name,
-        license=license_name,
-        language=language,
-        task_name=task_name,
-        task_description=task_description,
-        training_data_description=training_data_description,
-        training_framework=training_framework,
-        training_config_path=training_config_path,
-        eval_comparison_path=eval_comparison_path,
-        cost_report_path=cost_report_path,
-        sources=sources,
-        tags=tags,
-        private=private,
+        adapter_dir=_required_path(raw, "adapter_dir", path),
+        repo_id=_required_str(raw, "repo_id", path),
+        model_name=_required_str(raw, "model_name", path),
+        license=_required_str(raw, "license", path),
+        language=_optional_str(raw, "language", path, "en"),
+        task_name=_required_str(raw, "task_name", path),
+        task_description=_required_str(raw, "task_description", path),
+        training_data_description=_required_str(raw, "training_data_description", path),
+        training_framework=_required_str(raw, "training_framework", path),
+        training_config_path=_required_path(raw, "training_config_path", path),
+        eval_comparison_path=_optional_path(raw, "eval_comparison_path", path),
+        cost_report_path=_optional_path(raw, "cost_report_path", path),
+        sources=_optional_str_tuple(raw, "sources", path),
+        tags=_optional_str_tuple(raw, "tags", path),
+        private=_optional_bool(raw, "private", path, False),
     )
 
 
@@ -125,20 +106,41 @@ def build_card_data(config: PublishConfig) -> ModelCardData:
 
 
 def _load_eval_summary(path: Path) -> tuple[EvalSummaryRow, ...]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = _load_json_object(path, "comparison payload")
     variants = payload.get("variants", [])
+    if not isinstance(variants, list):
+        raise ValueError(f"{path}: variants must be a list")
+
     rows: list[EvalSummaryRow] = []
-    for variant in variants:
-        field_scores = variant.get("field_scores", {}) or {}
+    for index, variant in enumerate(variants):
+        if not isinstance(variant, dict):
+            raise ValueError(f"{path}: variants[{index}] must be an object")
+        field_scores = variant.get("field_scores", {})
+        if not isinstance(field_scores, dict):
+            raise ValueError(f"{path}: variants[{index}].field_scores must be an object")
         macro = (
-            sum(float(v) for v in field_scores.values()) / len(field_scores)
+            sum(
+                _required_rate(
+                    field_scores,
+                    field,
+                    path,
+                    f"variants[{index}].field_scores.{field}",
+                )
+                for field in field_scores
+            )
+            / len(field_scores)
             if field_scores
             else 0.0
         )
         rows.append(
             EvalSummaryRow(
-                variant=str(variant.get("variant", "")),
-                json_validity_rate=float(variant.get("json_validity_rate", 0.0)),
+                variant=_required_str(variant, "variant", path, f"variants[{index}].variant"),
+                json_validity_rate=_required_rate(
+                    variant,
+                    "json_validity_rate",
+                    path,
+                    f"variants[{index}].json_validity_rate",
+                ),
                 macro_f1=macro,
             )
         )
@@ -146,17 +148,42 @@ def _load_eval_summary(path: Path) -> tuple[EvalSummaryRow, ...]:
 
 
 def _load_cost_summary(path: Path) -> CostSummary:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    training = payload.get("training_cost", {})
-    fine_tuned = payload.get("fine_tuned", {})
-    breakeven = payload.get("breakeven", {})
+    payload = _load_json_object(path, "cost report payload")
+    training = _required_object(payload, "training_cost", path)
+    fine_tuned = _required_object(payload, "fine_tuned", path)
+    breakeven = _required_object(payload, "breakeven", path)
     return CostSummary(
-        training_total_usd=float(training.get("total_usd", 0.0)),
-        self_hosted_per_1m_tokens=float(fine_tuned.get("usd_per_1m_tokens", 0.0)),
-        primary_api_label=str(breakeven.get("primary_api_label", "")),
-        primary_api_per_1m_tokens=float(breakeven.get("primary_api_usd_per_1m", 0.0)),
-        breakeven_monthly_m_tokens=float(breakeven.get("monthly_volume_m_tokens", 0.0)),
-        breakeven_months_horizon=int(breakeven.get("months_horizon", 0)),
+        training_total_usd=_required_number(training, "total_usd", path, "training_cost.total_usd"),
+        self_hosted_per_1m_tokens=_required_number(
+            fine_tuned,
+            "usd_per_1m_tokens",
+            path,
+            "fine_tuned.usd_per_1m_tokens",
+        ),
+        primary_api_label=_required_str(
+            breakeven,
+            "primary_api_label",
+            path,
+            "breakeven.primary_api_label",
+        ),
+        primary_api_per_1m_tokens=_required_number(
+            breakeven,
+            "primary_api_usd_per_1m",
+            path,
+            "breakeven.primary_api_usd_per_1m",
+        ),
+        breakeven_monthly_m_tokens=_required_number(
+            breakeven,
+            "monthly_volume_m_tokens",
+            path,
+            "breakeven.monthly_volume_m_tokens",
+        ),
+        breakeven_months_horizon=_required_positive_int(
+            breakeven,
+            "months_horizon",
+            path,
+            "breakeven.months_horizon",
+        ),
     )
 
 
@@ -184,7 +211,7 @@ def run(args: argparse.Namespace) -> int:
         repo_id=config.repo_id,
         private=config.private,
     )
-    print(f"publish: uploaded → {url}", file=sys.stderr)
+    print(f"publish: uploaded -> {url}", file=sys.stderr)
     return 0
 
 
@@ -201,6 +228,113 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main() -> int:
     return run(parse_args())
+
+
+def _load_json_object(path: Path, label: str) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path}: {label} must be an object")
+    return cast(dict[str, Any], payload)
+
+
+def _required_object(mapping: dict[str, Any], key: str, path: Path) -> dict[str, Any]:
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {key}")
+    value = mapping[key]
+    if not isinstance(value, dict):
+        raise ValueError(f"{path}: {key} must be an object")
+    return cast(dict[str, Any], value)
+
+
+def _required_str(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> str:
+    label = display_key or key
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {label}")
+    value = mapping[key]
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{path}: {label} must be a non-empty string")
+    return value
+
+
+def _optional_str(mapping: dict[str, Any], key: str, path: Path, default: str) -> str:
+    if key not in mapping:
+        return default
+    return _required_str(mapping, key, path)
+
+
+def _required_path(mapping: dict[str, Any], key: str, path: Path) -> Path:
+    return Path(_required_str(mapping, key, path))
+
+
+def _optional_path(mapping: dict[str, Any], key: str, path: Path) -> Path | None:
+    if key not in mapping:
+        return None
+    return _required_path(mapping, key, path)
+
+
+def _optional_str_tuple(mapping: dict[str, Any], key: str, path: Path) -> tuple[str, ...]:
+    if key not in mapping:
+        return ()
+    value = mapping[key]
+    if not isinstance(value, list):
+        raise ValueError(f"{path}: {key} must be a list of non-empty strings")
+    items: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item:
+            raise ValueError(f"{path}: {key}[{index}] must be a non-empty string")
+        items.append(item)
+    return tuple(items)
+
+
+def _optional_bool(mapping: dict[str, Any], key: str, path: Path, default: bool) -> bool:
+    if key not in mapping:
+        return default
+    value = mapping[key]
+    if not isinstance(value, bool):
+        raise ValueError(f"{path}: {key} must be a boolean")
+    return value
+
+
+def _required_number(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> float:
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {display_key or key}")
+    return _non_negative_finite(mapping[key], f"{path}: {display_key or key}")
+
+
+def _required_rate(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> float:
+    label = f"{path}: {display_key or key}"
+    value = _required_number(mapping, key, path, display_key)
+    if value > 1.0:
+        raise ValueError(f"{label} must be between 0 and 1")
+    return value
+
+
+def _required_positive_int(
+    mapping: dict[str, Any], key: str, path: Path, display_key: str | None = None
+) -> int:
+    label = display_key or key
+    if key not in mapping:
+        raise ValueError(f"{path}: missing required key {label}")
+    value = mapping[key]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{path}: {label} must be an integer")
+    if value < 1:
+        raise ValueError(f"{path}: {label} must be an integer >= 1")
+    return value
+
+
+def _non_negative_finite(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError(f"{label} must be a non-negative finite number")
+    if value < 0:
+        raise ValueError(f"{label} must be a non-negative finite number")
+    return float(value)
 
 
 if __name__ == "__main__":

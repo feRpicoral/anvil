@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import gradio as gr
-from deploy.hf_spaces.three_way import (
+from three_way import (
     SAMPLE_CONTRACTS,
     _ensure_predictors,
     format_badge,

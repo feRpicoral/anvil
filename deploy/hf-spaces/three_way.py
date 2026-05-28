@@ -94,13 +94,14 @@ def format_badge(output: VariantOutput) -> str:
 
 def _ensure_predictors(state: dict[str, Any]) -> None:
     """Lazy-load the three predictors into `state` so the UI imports stay light."""
-    if "base" in state:
+    if {"base", "finetuned", "gpt_4o"} <= state.keys():
         return
     from anvil.eval.local_predictor import LocalExtractionPredictor
     from anvil.eval.openai_predictor import OpenAIExtractionPredictor
 
     base_model = state["base_model"]
     adapter_path = state["adapter_path"]
-    state["base"] = LocalExtractionPredictor(base_model=base_model)
-    state["finetuned"] = LocalExtractionPredictor(base_model=base_model, adapter_path=adapter_path)
-    state["gpt_4o"] = OpenAIExtractionPredictor()
+    base = LocalExtractionPredictor(base_model=base_model)
+    finetuned = LocalExtractionPredictor(base_model=base_model, adapter_path=adapter_path)
+    gpt_4o = OpenAIExtractionPredictor()
+    state.update({"base": base, "finetuned": finetuned, "gpt_4o": gpt_4o})

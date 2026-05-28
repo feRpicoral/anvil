@@ -8,20 +8,15 @@ runner uses.
 
 from __future__ import annotations
 
-import asyncio
 import sys
 from pathlib import Path
 
 import pytest
 
-# `deploy/` isn't part of the anvil package, so add it to sys.path so the
-# hyphenated `hf-spaces` directory is importable as `hf_spaces` via this
-# shim. This avoids polluting the project install with a symlink.
-_DEPLOY_ROOT = Path(__file__).resolve().parents[2] / "deploy"
-sys.path.insert(0, str(_DEPLOY_ROOT))
-sys.modules.setdefault("hf_spaces", __import__("importlib").import_module("hf-spaces"))
+_SPACE_ROOT = Path(__file__).resolve().parents[2] / "deploy" / "hf-spaces"
+sys.path.insert(0, str(_SPACE_ROOT))
 
-from hf_spaces.three_way import (  # type: ignore[import-not-found]  # noqa: E402
+from three_way import (  # type: ignore[import-not-found]  # noqa: E402
     SAMPLE_CONTRACTS,
     VariantOutput,
     _ensure_predictors,
@@ -40,9 +35,8 @@ def _make_predictor(raw_output: str = '{"ok": true}', cost: float = 0.01) -> Fix
             )
         }
     )
-    # FixturePredictor needs a contract_text -> case_id mapping; attach it manually.
     from anvil.data.schema import ContractExtraction
-    from anvil.eval.runner import EvalCase  # local to avoid top-level coupling
+    from anvil.eval.runner import EvalCase
 
     dummy_gold = ContractExtraction.model_validate(
         {
@@ -135,20 +129,30 @@ def test_ensure_predictors_populates_state_lazily(monkeypatch: pytest.MonkeyPatc
     assert "base" in state
     assert "finetuned" in state
     assert "gpt_4o" in state
-    # Second call is idempotent (no re-init).
     base_id = id(state["base"])
     _ensure_predictors(state)
     assert id(state["base"]) == base_id
 
 
+def test_ensure_predictors_retries_after_partial_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-real")
+    state: dict[str, object] = {
+        "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+        "adapter_path": Path("outputs/smoke/final"),
+        "base": object(),
+    }
+
+    _ensure_predictors(state)
+
+    assert "finetuned" in state
+    assert "gpt_4o" in state
+
+
 def test_async_gather_does_not_block_on_each_predictor() -> None:
-    # Each FixturePredictor returns immediately; the gather should complete
-    # in under 100 ms even though we have three async calls.
     base = _make_predictor()
     finetuned = _make_predictor()
     gpt = _make_predictor()
 
-    asyncio.run(asyncio.sleep(0))  # warm the event loop
     import time
 
     start = time.perf_counter()

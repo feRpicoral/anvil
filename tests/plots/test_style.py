@@ -1,8 +1,21 @@
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
+
 import matplotlib as mpl
+import pytest
+from matplotlib.colors import to_rgba
 
 from anvil.plots.style import apply_style, palette
+
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+@pytest.fixture(autouse=True)
+def _restore_rcparams() -> Iterator[None]:
+    with mpl.rc_context():
+        yield
 
 
 def test_palette_has_three_way_variant_keys() -> None:
@@ -13,8 +26,7 @@ def test_palette_has_three_way_variant_keys() -> None:
 
 def test_palette_values_are_hex_strings() -> None:
     for name, value in palette().items():
-        assert value.startswith("#"), f"{name}: {value!r} should start with '#'"
-        assert len(value) == 7, f"{name}: expected 7-char hex, got {value!r}"
+        assert _HEX_COLOR_RE.fullmatch(value) is not None, f"{name}: invalid hex color {value!r}"
 
 
 def test_palette_assigns_distinct_colors_to_variants() -> None:
@@ -40,9 +52,6 @@ def test_apply_style_sets_savefig_dpi() -> None:
 
 def test_apply_style_sets_white_facecolor() -> None:
     apply_style()
-
-    # `to_rgba` normalizes any matplotlib color spec to a tuple; "white" → (1,1,1,1).
-    from matplotlib.colors import to_rgba
 
     assert to_rgba(mpl.rcParams["figure.facecolor"]) == to_rgba("white")
     assert to_rgba(mpl.rcParams["axes.facecolor"]) == to_rgba("white")

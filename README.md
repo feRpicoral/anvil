@@ -67,34 +67,17 @@ JSON files are populated.
 
 ## Architecture
 
-```
-                   data-smoke / data-full
-   ┌──────────────────────────────────────────────────────┐
-   │  synth (fixture | OpenAI | Anthropic)                │
-   │  curate (length + language + schema + dedup)         │
-   │  split (stratified, anti-contamination hash guard)   │
-   │  format (chat-template messages JSONL)               │
-   └────────────┬─────────────────────────────────────────┘
-                │  data/{smoke,full}/{train,val,test}.jsonl
-                ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  train (TRL on M1, Unsloth on 4090; both backends    │
-   │  consume the same TrainingConfig dataclass)          │
-   └────────────┬─────────────────────────────────────────┘
-                │  outputs/{smoke,full}/final/  (LoRA adapter)
-                ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  eval (three predictors behind one Protocol:         │
-   │       FixturePredictor | LocalExtractionPredictor    │
-   │       | OpenAIExtractionPredictor)                   │
-   └────────────┬─────────────────────────────────────────┘
-                │  results/eval/{smoke,full}/comparison.json
-                ▼
-   ┌──────────────────────────────────────────────────────┐
-   │  cost (training $ + self-hosted $/1M + breakeven)    │
-   │  chart (5 PNGs)                                      │
-   │  publish (model card + HF Hub adapter upload)        │
-   └──────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Data["<b>data-smoke / data-full</b><br/>synth (fixture · OpenAI · Anthropic)<br/>curate (length + language + schema + dedup)<br/>split (stratified, anti-contamination hash guard)<br/>format (chat-template messages JSONL)"]
+    DataOut[("data/{smoke,full}/{train,val,test}.jsonl")]
+    Train["<b>train</b><br/>TRL on M1, Unsloth on 4090<br/>shared TrainingConfig dataclass"]
+    TrainOut[("outputs/{smoke,full}/final/ (LoRA adapter)")]
+    Eval["<b>eval</b><br/>three predictors behind one Protocol:<br/>FixturePredictor · LocalExtractionPredictor · OpenAIExtractionPredictor"]
+    EvalOut[("results/eval/{smoke,full}/comparison.json")]
+    Final["<b>cost</b>: training $ + self-hosted $/1M + breakeven<br/><b>chart</b>: 5 PNGs<br/><b>publish</b>: model card + HF Hub adapter upload"]
+
+    Data --> DataOut --> Train --> TrainOut --> Eval --> EvalOut --> Final
 ```
 
 ## Local development

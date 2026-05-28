@@ -1,4 +1,4 @@
-.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke eval-full cost cost-full rehearse
+.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke eval-full cost cost-full rehearse chart
 
 PYTHON := uv run python
 DATA_SMOKE_DIR := data/smoke
@@ -24,6 +24,7 @@ help:
 	@echo "  cost         build the cost-comparison JSON (training + inference + breakeven)"
 	@echo "  cost-full    run full eval, then build the full-run cost JSON"
 	@echo "  rehearse     M1 dress-rehearsal of the full RunPod orchestrator; zero API spend"
+	@echo "  chart        regenerate the five canonical README charts under results/charts/"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -90,6 +91,9 @@ cost-full: eval-full
 
 rehearse:
 	bash deploy/runpod-train.sh --rehearsal
+
+chart: cost
+	$(PYTHON) -m scripts.chart
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

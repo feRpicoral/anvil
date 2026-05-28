@@ -1,4 +1,4 @@
-.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke
+.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke cost
 
 PYTHON := uv run python
 DATA_SMOKE_DIR := data/smoke
@@ -20,6 +20,7 @@ help:
 	@echo "  train-smoke  generate smoke data and run TRL smoke training"
 	@echo "  train-full   paid Unsloth + Llama 3.1 8B QLoRA run (requires CONFIRM_PAID=1, HF_TOKEN, GPU)"
 	@echo "  eval-smoke   3-variant fixture eval; zero API spend; writes results/eval/smoke/"
+	@echo "  cost         build the cost-comparison JSON (training + inference + breakeven)"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
 
@@ -70,6 +71,9 @@ endif
 
 eval-smoke:
 	$(PYTHON) -m scripts.eval --config configs/eval-smoke.toml
+
+cost: eval-smoke
+	$(PYTHON) -m scripts.cost --config configs/cost-smoke.toml
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage coverage.xml

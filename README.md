@@ -1,5 +1,8 @@
 # Anvil
 
+[![CI](https://github.com/feRpicoral/anvil/actions/workflows/ci.yml/badge.svg)](https://github.com/feRpicoral/anvil/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Production-grade LLM fine-tuning with LoRA/QLoRA — dataset synthesis, rigorous eval, cost analysis.
 
 > **Numbers in this README are illustrative pending the paid Llama 3.1 8B QLoRA run.**
@@ -60,7 +63,7 @@ JSON files are populated.
 | Eval | Field-level scores + JSON-validity rate across base / fine-tuned / GPT-4o | Validity gates every score; unparsable output does not get credit |
 | GPU | RunPod RTX 4090 24 GB Community | Cheapest tier that fits Llama 3.1 8B at QLoRA |
 | Publishing | Hugging Face Hub (adapter + model card) | Standard distribution path |
-| HF demo | Gradio on Spaces ZeroGPU (in progress) | Free, low-friction interactive demo |
+| HF demo | Gradio on Spaces ZeroGPU ([`deploy/hf-spaces/`](deploy/hf-spaces/)) | Free, low-friction three-way side-by-side |
 
 ## Architecture
 

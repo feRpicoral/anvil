@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -42,31 +43,45 @@ _BREAKEVEN_PNG = "breakeven.png"
 
 
 def load_loss_history(path: Path) -> list[LossSample]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = _read_json(path)
     if not isinstance(payload, list):
         raise ValueError(f"{path}: loss history must be a JSON array")
-    return [
-        LossSample(
-            step=int(row["step"]),
-            train_loss=float(row["train_loss"]),
-            val_loss=float(row["val_loss"]) if row.get("val_loss") is not None else None,
+    history: list[LossSample] = []
+    for index, item in enumerate(payload):
+        row = _object(item, f"{path}: loss_history[{index}]")
+        history.append(
+            LossSample(
+                step=_required_non_negative_int(row, "step", f"{path}: loss_history[{index}]"),
+                train_loss=_required_non_negative_finite(
+                    row, "train_loss", f"{path}: loss_history[{index}]"
+                ),
+                val_loss=_optional_non_negative_finite(
+                    row, "val_loss", f"{path}: loss_history[{index}]"
+                ),
+            )
         )
-        for row in payload
-    ]
+    return history
 
 
 def load_validity_and_field_scores(
     path: Path,
 ) -> tuple[dict[str, float], dict[str, dict[str, float]]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    variants = payload.get("variants", [])
+    payload = _object(_read_json(path), f"{path}: comparison payload")
+    variants = _optional_array(payload, "variants", f"{path}: comparison payload")
     validity: dict[str, float] = {}
     field_scores: dict[str, dict[str, float]] = {}
-    for variant in variants:
-        name = str(variant["variant"])
-        validity[name] = float(variant.get("json_validity_rate", 0.0))
+    for index, item in enumerate(variants):
+        variant = _object(item, f"{path}: variants[{index}]")
+        name = _required_non_empty_str(variant, "variant", f"{path}: variants[{index}]")
+        if name in validity:
+            raise ValueError(f"{path}: duplicate variant {name!r}")
+        validity[name] = _required_rate(variant, "json_validity_rate", f"{path}: variants[{index}]")
+        scores = _optional_object(variant, "field_scores", f"{path}: variants[{index}]")
         field_scores[name] = {
-            str(k): float(v) for k, v in (variant.get("field_scores", {}) or {}).items()
+            _non_empty_str(key, f"{path}: variants[{index}].field_scores key"): _rate(
+                value, f"{path}: variants[{index}].field_scores[{key!r}]"
+            )
+            for key, value in scores.items()
         }
     return validity, field_scores
 
@@ -74,41 +89,42 @@ def load_validity_and_field_scores(
 def load_cost_payload(
     path: Path,
 ) -> tuple[CostComparison, list[BreakevenPoint], float, str]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    inference = payload.get("inference_cost", {})
-    self_hosted = [
-        CostScenario(
-            label=str(row["label"]),
-            usd_per_1m_tokens=float(row["usd_per_1m_tokens"]),
-            notes=str(row.get("notes", "")),
-        )
-        for row in inference.get("self_hosted", [])
-    ]
-    api = [
-        CostScenario(
-            label=str(row["label"]),
-            usd_per_1m_tokens=float(row["usd_per_1m_tokens"]),
-            notes=str(row.get("notes", "")),
-        )
-        for row in inference.get("api", [])
-    ]
+    payload = _object(_read_json(path), f"{path}: cost payload")
+    inference = _optional_object(payload, "inference_cost", f"{path}: cost payload")
+    self_hosted = _cost_scenarios(inference, "self_hosted", f"{path}: inference_cost")
+    api = _cost_scenarios(inference, "api", f"{path}: inference_cost")
     comparison = CostComparison(
         self_hosted=self_hosted,
         api=api,
-        input_share=float(inference.get("input_share", 0.5)),
-        notes=[str(n) for n in inference.get("notes", [])],
+        input_share=_optional_rate(inference, "input_share", f"{path}: inference_cost", 0.5),
+        notes=_optional_str_list(inference, "notes", f"{path}: inference_cost"),
     )
-    breakeven = payload.get("breakeven", {})
-    curve = [
-        BreakevenPoint(
-            month=int(p["month"]),
-            cumulative_finetuned_usd=float(p["cumulative_finetuned_usd"]),
-            cumulative_api_usd=float(p["cumulative_api_usd"]),
+    breakeven = _optional_object(payload, "breakeven", f"{path}: cost payload")
+    curve_rows = _optional_array(breakeven, "curve", f"{path}: breakeven")
+    curve: list[BreakevenPoint] = []
+    for index, item in enumerate(curve_rows):
+        point = _object(item, f"{path}: breakeven.curve[{index}]")
+        curve.append(
+            BreakevenPoint(
+                month=_required_non_negative_int(
+                    point, "month", f"{path}: breakeven.curve[{index}]"
+                ),
+                cumulative_finetuned_usd=_required_non_negative_finite(
+                    point, "cumulative_finetuned_usd", f"{path}: breakeven.curve[{index}]"
+                ),
+                cumulative_api_usd=_required_non_negative_finite(
+                    point, "cumulative_api_usd", f"{path}: breakeven.curve[{index}]"
+                ),
+            )
         )
-        for p in breakeven.get("curve", [])
-    ]
-    monthly_volume = float(breakeven.get("monthly_volume_m_tokens", 0.0))
-    primary_api_label = str(breakeven.get("primary_api_label", "API"))
+    monthly_volume = (
+        _required_non_negative_finite(breakeven, "monthly_volume_m_tokens", f"{path}: breakeven")
+        if curve
+        else 0.0
+    )
+    primary_api_label = _optional_non_empty_str(
+        breakeven, "primary_api_label", f"{path}: breakeven", "API"
+    )
     return comparison, curve, monthly_volume, primary_api_label
 
 
@@ -163,7 +179,7 @@ def run(args: argparse.Namespace) -> int:
         print("chart: nothing to draw (no inputs found)", file=sys.stderr)
         return 0
     rendered = ", ".join(p.name for p in written)
-    print(f"chart: wrote {len(written)} chart(s) ({rendered}) → {output_dir}", file=sys.stderr)
+    print(f"chart: wrote {len(written)} chart(s) ({rendered}) -> {output_dir}", file=sys.stderr)
     return 0
 
 
@@ -200,7 +216,135 @@ def main() -> int:
     return run(parse_args())
 
 
-_ = (BreakevenPoint, CostScenario, Any)  # re-export anchors for the type checker
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    return value
+
+
+def _optional_object(mapping: dict[str, Any], key: str, label: str) -> dict[str, Any]:
+    if key not in mapping:
+        return {}
+    return _object(mapping[key], f"{label}.{key}")
+
+
+def _optional_array(mapping: dict[str, Any], key: str, label: str) -> list[Any]:
+    if key not in mapping:
+        return []
+    value = mapping[key]
+    if not isinstance(value, list):
+        raise ValueError(f"{label}.{key} must be a JSON array")
+    return value
+
+
+def _required(mapping: dict[str, Any], key: str, label: str) -> Any:
+    try:
+        return mapping[key]
+    except KeyError as exc:
+        raise ValueError(f"{label}.{key} is required") from exc
+
+
+def _string(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    return value
+
+
+def _non_empty_str(value: Any, label: str) -> str:
+    text = _string(value, label)
+    if not text:
+        raise ValueError(f"{label} must be a non-empty string")
+    return text
+
+
+def _required_non_empty_str(mapping: dict[str, Any], key: str, label: str) -> str:
+    return _non_empty_str(_required(mapping, key, label), f"{label}.{key}")
+
+
+def _optional_non_empty_str(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+    default: str,
+) -> str:
+    if key not in mapping:
+        return default
+    return _non_empty_str(mapping[key], f"{label}.{key}")
+
+
+def _optional_str_list(mapping: dict[str, Any], key: str, label: str) -> list[str]:
+    if key not in mapping:
+        return []
+    values = mapping[key]
+    if not isinstance(values, list):
+        raise ValueError(f"{label}.{key} must be a JSON array")
+    return [_string(item, f"{label}.{key}[{index}]") for index, item in enumerate(values)]
+
+
+def _required_non_negative_int(mapping: dict[str, Any], key: str, label: str) -> int:
+    value = _required(mapping, key, label)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{label}.{key} must be a non-negative integer")
+    return value
+
+
+def _non_negative_finite(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError(f"{label} must be a non-negative finite number")
+    if value < 0:
+        raise ValueError(f"{label} must be a non-negative finite number")
+    return float(value)
+
+
+def _required_non_negative_finite(mapping: dict[str, Any], key: str, label: str) -> float:
+    return _non_negative_finite(_required(mapping, key, label), f"{label}.{key}")
+
+
+def _optional_non_negative_finite(
+    mapping: dict[str, Any],
+    key: str,
+    label: str,
+) -> float | None:
+    if key not in mapping or mapping[key] is None:
+        return None
+    return _non_negative_finite(mapping[key], f"{label}.{key}")
+
+
+def _rate(value: Any, label: str) -> float:
+    rate = _non_negative_finite(value, label)
+    if rate > 1.0:
+        raise ValueError(f"{label} must be between 0 and 1")
+    return rate
+
+
+def _required_rate(mapping: dict[str, Any], key: str, label: str) -> float:
+    return _rate(_required(mapping, key, label), f"{label}.{key}")
+
+
+def _optional_rate(mapping: dict[str, Any], key: str, label: str, default: float) -> float:
+    if key not in mapping:
+        return default
+    return _rate(mapping[key], f"{label}.{key}")
+
+
+def _cost_scenarios(mapping: dict[str, Any], key: str, label: str) -> list[CostScenario]:
+    scenarios: list[CostScenario] = []
+    for index, item in enumerate(_optional_array(mapping, key, label)):
+        row = _object(item, f"{label}.{key}[{index}]")
+        scenarios.append(
+            CostScenario(
+                label=_required_non_empty_str(row, "label", f"{label}.{key}[{index}]"),
+                usd_per_1m_tokens=_required_non_negative_finite(
+                    row, "usd_per_1m_tokens", f"{label}.{key}[{index}]"
+                ),
+                notes=_string(row.get("notes", ""), f"{label}.{key}[{index}].notes"),
+            )
+        )
+    return scenarios
 
 
 if __name__ == "__main__":

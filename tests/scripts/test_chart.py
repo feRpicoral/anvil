@@ -137,6 +137,62 @@ def test_load_loss_history_rejects_non_array(tmp_path: Path) -> None:
         load_loss_history(path)
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [{"step": True, "train_loss": 1.0}],
+        [{"step": 1.9, "train_loss": 1.0}],
+        [{"step": 1, "train_loss": "1.0"}],
+    ],
+)
+def test_load_loss_history_rejects_coerced_values(
+    tmp_path: Path, payload: list[dict[str, object]]
+) -> None:
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        load_loss_history(path)
+
+
+def test_load_validity_and_field_scores_rejects_non_string_variant(tmp_path: Path) -> None:
+    path = tmp_path / "eval.json"
+    path.write_text(
+        json.dumps({"variants": [{"variant": None, "json_validity_rate": 1.0}]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="variant"):
+        load_validity_and_field_scores(path)
+
+
+def test_load_cost_payload_rejects_coerced_scenario_cost(tmp_path: Path) -> None:
+    path = tmp_path / "cost.json"
+    payload = {
+        "inference_cost": {
+            "self_hosted": [{"label": "local", "usd_per_1m_tokens": "0.22"}],
+            "api": [],
+        }
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="usd_per_1m_tokens"):
+        load_cost_payload(path)
+
+
+def test_load_cost_payload_requires_monthly_volume_for_breakeven_curve(tmp_path: Path) -> None:
+    path = tmp_path / "cost.json"
+    payload = {
+        "breakeven": {
+            "curve": [{"month": 0, "cumulative_finetuned_usd": 10.0, "cumulative_api_usd": 0.0}]
+        }
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="monthly_volume_m_tokens"):
+        load_cost_payload(path)
+
+
 def test_run_writes_four_charts_when_loss_history_absent(tmp_path: Path) -> None:
     eval_path = _write_eval_comparison(tmp_path / "eval.json")
     cost_path = _write_cost_report(tmp_path / "cost.json")

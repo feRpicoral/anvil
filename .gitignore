@@ -80,6 +80,7 @@ results/scratch/
 results/eval/smoke/
 results/train/smoke/
 results/cost/
+results/charts/
 
 # Local logs (root-anchored)
 /logs/

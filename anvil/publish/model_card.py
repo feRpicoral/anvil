@@ -5,13 +5,11 @@ real run metadata (training config + eval comparison + cost report); this
 module produces the YAML-fronted Markdown that HF Hub expects, with
 conditional blocks for eval and cost so a pre-eval upload still produces
 a readable card.
-
-No Jinja dep — substitutions are f-strings, conditional blocks live in
-small Python helpers.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Final
 
@@ -82,17 +80,22 @@ def render(data: ModelCardData) -> str:
 
 
 def _render_frontmatter(data: ModelCardData) -> str:
-    tags = [tag for tag in data.tags if tag not in _TAG_BLOCKLIST]
-    tag_lines = "\n".join(f"  - {tag}" for tag in tags)
-    return (
-        "---\n"
-        f"base_model: {data.base_model}\n"
-        f"language: {data.language}\n"
-        f"license: {data.license}\n"
-        "library_name: peft\n"
-        "tags:\n"
-        f"{tag_lines}\n"
-        "---\n\n"
+    tags = _clean_tags(data.tags)
+    tag_block = (
+        "tags: []\n"
+        if not tags
+        else "tags:\n" + "\n".join(f"  - {_yaml(tag)}" for tag in tags) + "\n"
+    )
+    return "".join(
+        [
+            "---\n",
+            f"base_model: {_yaml(data.base_model)}\n",
+            f"language: {_yaml(data.language)}\n",
+            f"license: {_yaml(data.license)}\n",
+            "library_name: peft\n",
+            tag_block,
+            "---\n\n",
+        ]
     )
 
 
@@ -109,7 +112,7 @@ def _render_intended_use(data: ModelCardData) -> str:
     return (
         "## Intended use\n\n"
         f"{data.task_name}. {data.task_description}\n\n"
-        "**Out of scope.** General-purpose chat or instruction following — the adapter is "
+        "**Out of scope.** General-purpose chat or instruction following - the adapter is "
         "specialized to the extraction task and will degrade on unrelated prompts.\n\n"
     )
 
@@ -136,7 +139,8 @@ def _render_eval(data: ModelCardData) -> str:
         )
     header = "| Variant | JSON validity | Macro F1 | Notes |\n|---|---|---|---|\n"
     rows = "".join(
-        f"| {row.variant} | {row.json_validity_rate:.2%} | {row.macro_f1:.2%} | {row.notes} |\n"
+        f"| {_table_cell(row.variant)} | {row.json_validity_rate:.2%} | "
+        f"{row.macro_f1:.2%} | {_table_cell(row.notes)} |\n"
         for row in data.eval_summary
     )
     return "## Evaluation\n\n" + header + rows + "\n"
@@ -173,14 +177,41 @@ def _render_limitations(data: ModelCardData) -> str:
         "- Trained on synthesized contracts plus a hand-curated real-world test slice; "
         "performance on out-of-distribution legal text (regulated jurisdictions, niche "
         "clauses) is not validated.\n"
-        "- JSON output is enforced by training, not by a runtime grammar — production "
+        "- JSON output is enforced by training, not by a runtime grammar; production "
         "use should still validate every parse.\n"
         "- No safety tuning beyond the base model's. Do not feed adversarial inputs.\n\n"
     )
 
 
 def _render_citations(data: ModelCardData) -> str:
-    if not data.sources:
+    sources = []
+    for source in data.sources:
+        normalized = _one_line(source)
+        if normalized:
+            sources.append(normalized)
+    if not sources:
         return ""
-    lines = "\n".join(f"- {source}" for source in data.sources)
+    lines = "\n".join(f"- {source}" for source in sources)
     return f"## References\n\n{lines}\n"
+
+
+def _clean_tags(tags: tuple[str, ...]) -> list[str]:
+    cleaned: list[str] = []
+    for tag in tags:
+        normalized = tag.strip()
+        if normalized in _TAG_BLOCKLIST:
+            continue
+        cleaned.append(normalized)
+    return cleaned
+
+
+def _yaml(value: str) -> str:
+    return json.dumps(value)
+
+
+def _table_cell(value: str) -> str:
+    return _one_line(value).replace("|", r"\|")
+
+
+def _one_line(value: str) -> str:
+    return " ".join(value.split())

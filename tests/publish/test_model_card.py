@@ -33,9 +33,9 @@ def test_render_starts_with_yaml_frontmatter() -> None:
     card = render(_minimal_data())
 
     assert card.startswith("---\n")
-    assert "base_model: meta-llama/Llama-3.1-8B-Instruct" in card
-    assert "language: en" in card
-    assert "license: llama3.1" in card
+    assert 'base_model: "meta-llama/Llama-3.1-8B-Instruct"' in card
+    assert 'language: "en"' in card
+    assert 'license: "llama3.1"' in card
     assert "library_name: peft" in card
 
 
@@ -57,15 +57,28 @@ def test_render_emits_default_tags() -> None:
     card = render(_minimal_data())
 
     for tag in ("text-generation", "lora", "qlora"):
-        assert f"- {tag}" in card
+        assert f'- "{tag}"' in card
 
 
-def test_render_drops_blocklisted_tags() -> None:
-    card = render(_minimal_data(tags=("text-generation", "", "<keep-me-or-cite>", "legal")))
+def test_render_drops_blocklisted_tags_and_strips_kept_tags() -> None:
+    card = render(_minimal_data(tags=(" text-generation ", " ", "<keep-me-or-cite>", "legal")))
 
-    assert "- text-generation" in card
-    assert "- legal" in card
+    assert '- "text-generation"' in card
+    assert '- "legal"' in card
     assert "<keep-me-or-cite>" not in card
+
+
+def test_render_empty_tags_as_yaml_list() -> None:
+    card = render(_minimal_data(tags=("", "<keep-me-or-cite>")))
+
+    assert "tags: []" in card
+
+
+def test_render_quotes_frontmatter_scalars() -> None:
+    card = render(_minimal_data(base_model="org/model: v1", license="custom:internal"))
+
+    assert 'base_model: "org/model: v1"' in card
+    assert 'license: "custom:internal"' in card
 
 
 def test_render_eval_block_is_placeholder_without_results() -> None:
@@ -86,6 +99,21 @@ def test_render_eval_block_renders_table_when_results_present() -> None:
     assert "| Variant |" in eval_block
     assert "| finetuned | 99.00% | 82.00%" in eval_block
     assert "| gpt-4o | 100.00% | 85.00%" in eval_block
+
+
+def test_render_eval_table_escapes_cells() -> None:
+    rows = (
+        EvalSummaryRow(
+            variant="fine|tuned",
+            json_validity_rate=0.99,
+            macro_f1=0.82,
+            notes="line one\nline | two",
+        ),
+    )
+    card = render(_minimal_data(eval_summary=rows))
+
+    eval_block = card.split("## Evaluation", 1)[1].split("##", 1)[0]
+    assert "| fine\\|tuned | 99.00% | 82.00% | line one line \\| two |" in eval_block
 
 
 def test_render_cost_block_is_placeholder_without_cost() -> None:
@@ -136,11 +164,17 @@ def test_render_references_block_omitted_when_no_sources() -> None:
     assert "## References" not in card
 
 
+def test_render_references_block_omitted_when_sources_are_blank() -> None:
+    card = render(_minimal_data(sources=("", "  ")))
+
+    assert "## References" not in card
+
+
 def test_render_references_block_included_when_sources_supplied() -> None:
-    card = render(_minimal_data(sources=("https://example.com/cuad-paper",)))
+    card = render(_minimal_data(sources=("https://example.com/cuad-paper\nextra",)))
 
     assert "## References" in card
-    assert "https://example.com/cuad-paper" in card
+    assert "https://example.com/cuad-paper extra" in card
 
 
 def test_render_training_block_includes_hyperparameters() -> None:

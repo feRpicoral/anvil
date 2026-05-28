@@ -1,4 +1,4 @@
-.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke cost rehearse
+.PHONY: help install lint format format-check typecheck test check clean data-smoke data-full train-smoke train-full eval-smoke eval-full cost cost-full rehearse
 
 PYTHON := uv run python
 DATA_SMOKE_DIR := data/smoke
@@ -20,7 +20,9 @@ help:
 	@echo "  train-smoke  generate smoke data and run TRL smoke training"
 	@echo "  train-full   paid Unsloth + Llama 3.1 8B QLoRA run (requires CONFIRM_PAID=1, HF_TOKEN, GPU)"
 	@echo "  eval-smoke   3-variant fixture eval; zero API spend; writes results/eval/smoke/"
+	@echo "  eval-full    paid local+OpenAI eval; writes results/eval/full/"
 	@echo "  cost         build the cost-comparison JSON (training + inference + breakeven)"
+	@echo "  cost-full    run full eval, then build the full-run cost JSON"
 	@echo "  rehearse     M1 dress-rehearsal of the full RunPod orchestrator; zero API spend"
 	@echo ""
 	@echo "  clean        Remove caches and build artefacts"
@@ -73,8 +75,18 @@ endif
 eval-smoke:
 	$(PYTHON) -m scripts.eval --config configs/eval-smoke.toml
 
+eval-full:
+ifneq ($(CONFIRM_PAID),1)
+	@echo "eval-full can call paid APIs and load local models. Re-invoke with CONFIRM_PAID=1 to proceed."
+	@exit 1
+endif
+	$(PYTHON) -m scripts.eval --config configs/eval-full.toml
+
 cost: eval-smoke
 	$(PYTHON) -m scripts.cost --config configs/cost-smoke.toml
+
+cost-full: eval-full
+	$(PYTHON) -m scripts.cost --config configs/cost-full.toml
 
 rehearse:
 	bash deploy/runpod-train.sh --rehearsal

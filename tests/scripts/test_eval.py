@@ -302,3 +302,12 @@ def test_smoke_config_file_loads() -> None:
 
     assert len(config.variants) == 3
     assert {v.name for v in config.variants} == {"base", "finetuned", "gpt-4o"}
+
+
+def test_full_config_file_loads() -> None:
+    config = load_eval_config(Path("configs/eval-full.toml"))
+
+    assert config.test_jsonl == Path("data/full/test.jsonl")
+    assert config.output_dir == Path("results/eval/full")
+    assert [v.predictor for v in config.variants] == ["local", "local", "openai"]
+    assert config.variants[1].adapter_path == Path("outputs/full")

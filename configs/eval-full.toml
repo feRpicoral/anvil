@@ -1,0 +1,18 @@
+test_jsonl = "data/full/test.jsonl"
+output_dir = "results/eval/full"
+
+[[variant]]
+name = "base"
+predictor = "local"
+base_model = "meta-llama/Llama-3.1-8B-Instruct"
+
+[[variant]]
+name = "finetuned"
+predictor = "local"
+base_model = "meta-llama/Llama-3.1-8B-Instruct"
+adapter_path = "outputs/full"
+
+[[variant]]
+name = "gpt-4o"
+predictor = "openai"
+model = "gpt-4o-2024-08-06"

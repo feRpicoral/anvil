@@ -294,3 +294,11 @@ def test_smoke_config_file_loads() -> None:
     assert isinstance(config, CostConfig)
     assert config.training_gpu_tier_key == "runpod-rtx-4090-community"
     assert config.months_horizon == 12
+
+
+def test_full_config_file_loads() -> None:
+    config = load_cost_config(Path("configs/cost-full.toml"))
+
+    assert isinstance(config, CostConfig)
+    assert config.output_path == Path("results/cost/full.json")
+    assert config.eval_comparison_path == Path("results/eval/full/comparison.json")

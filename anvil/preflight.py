@@ -1,18 +1,9 @@
-"""Pre-flight checks for the paid GPU run.
-
-A pile of small, pure functions that each return a `CheckResult`. The
-runner composes them, and `PreflightFailure` aborts the orchestration on
-the first failure with a clear summary of what's missing. CUDA / GPU
-checks lazy-import `torch` so the module stays usable on the M1 dev
-install where `torch` isn't present.
-
-The orchestrator script (`deploy/runpod-train.sh`) calls
-`python -m anvil.preflight` before doing anything destructive.
-"""
+"""Pre-flight checks for the paid GPU run."""
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
+import math
 import shutil
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -54,7 +45,7 @@ class PreflightError(RuntimeError):
 def check_env_var(name: str, env: Mapping[str, str]) -> CheckResult:
     """Check `env[name]` is set and non-empty."""
     value = env.get(name, "")
-    if value:
+    if value.strip():
         return CheckResult(name=f"env:{name}", passed=True, detail="set")
     return CheckResult(name=f"env:{name}", passed=False, detail="missing or empty")
 
@@ -65,9 +56,11 @@ def check_env_vars(names: Sequence[str], env: Mapping[str, str]) -> list[CheckRe
 
 def check_disk_space(path: Path, min_gb: float) -> CheckResult:
     """Check the filesystem holding `path` has at least `min_gb` of free space."""
+    if isinstance(min_gb, bool) or not isinstance(min_gb, int | float) or not math.isfinite(min_gb):
+        raise ValueError("min_gb must be a positive finite number")
     if min_gb <= 0:
-        raise ValueError("min_gb must be > 0")
-    target = path if path.exists() else path.parent if path.parent.exists() else Path.cwd()
+        raise ValueError("min_gb must be a positive finite number")
+    target = _nearest_existing_path(path)
     usage = shutil.disk_usage(target)
     free_gb = usage.free / (1024**3)
     passed = free_gb >= min_gb
@@ -79,11 +72,13 @@ def check_disk_space(path: Path, min_gb: float) -> CheckResult:
 
 
 def check_module_importable(name: str) -> CheckResult:
-    """Check that `import name` succeeds without invoking the module."""
+    """Check that a module can be found without executing its top-level code."""
     try:
-        importlib.import_module(name)
-    except ImportError as exc:
+        spec = importlib.util.find_spec(name)
+    except (ImportError, ValueError) as exc:
         return CheckResult(name=f"import:{name}", passed=False, detail=str(exc))
+    if spec is None:
+        return CheckResult(name=f"import:{name}", passed=False, detail="module not found")
     return CheckResult(name=f"import:{name}", passed=True, detail="ok")
 
 
@@ -169,9 +164,18 @@ def full_run_checks() -> list[CheckResult]:
     checks.append(check_disk_space(Path.cwd(), min_gb=20.0))
     checks.extend(check_modules_importable(["torch", "transformers", "trl", "peft", "datasets"]))
     checks.append(check_cuda_available())
-    # RTX 4090 = (8, 9). Anything Ampere+ clears the QLoRA stack's requirements.
     checks.append(check_compute_capability(min_major=8, min_minor=0))
     return checks
+
+
+def _nearest_existing_path(path: Path) -> Path:
+    candidate = path
+    while not candidate.exists():
+        parent = candidate.parent
+        if parent == candidate:
+            return Path.cwd()
+        candidate = parent
+    return candidate
 
 
 def main(argv: list[str] | None = None) -> int:

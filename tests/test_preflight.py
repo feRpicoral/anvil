@@ -9,6 +9,8 @@ from anvil.preflight import (
     PreflightError,
     PreflightReport,
     assert_passed,
+    check_compute_capability,
+    check_cuda_available,
     check_disk_space,
     check_env_var,
     check_env_vars,
@@ -39,6 +41,12 @@ def test_check_env_var_fails_when_empty() -> None:
     assert result.passed is False
 
 
+def test_check_env_var_fails_when_blank() -> None:
+    result = check_env_var("FOO", {"FOO": "   "})
+
+    assert result.passed is False
+
+
 def test_check_env_vars_returns_one_result_per_name() -> None:
     results = check_env_vars(["A", "B", "C"], {"A": "1", "C": "3"})
 
@@ -53,16 +61,25 @@ def test_check_disk_space_passes_for_existing_path(tmp_path: Path) -> None:
     assert "GB free" in result.detail
 
 
-def test_check_disk_space_falls_back_to_cwd_for_nonexistent_path(tmp_path: Path) -> None:
-    nonexistent = tmp_path / "does" / "not" / "exist"
+def test_check_disk_space_falls_back_to_nearest_parent(tmp_path: Path) -> None:
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    nonexistent = parent / "does" / "not" / "exist"
     result = check_disk_space(nonexistent, min_gb=0.0001)
 
     assert result.passed is True
+    assert result.name == f"disk:{parent}"
 
 
 def test_check_disk_space_rejects_zero_min_gb(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="min_gb"):
         check_disk_space(tmp_path, min_gb=0)
+
+
+@pytest.mark.parametrize("min_gb", [float("inf"), float("nan"), True])
+def test_check_disk_space_rejects_invalid_min_gb(tmp_path: Path, min_gb: float) -> None:
+    with pytest.raises(ValueError, match="min_gb"):
+        check_disk_space(tmp_path, min_gb=min_gb)
 
 
 def test_check_disk_space_reports_failure_when_threshold_too_high(tmp_path: Path) -> None:
@@ -83,6 +100,18 @@ def test_check_module_importable_fails_for_unknown() -> None:
 
     assert result.passed is False
     assert result.name == "import:totally_not_a_real_module_xyz"
+
+
+def test_check_module_importable_does_not_execute_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "explodes_on_import.py"
+    module_path.write_text("raise RuntimeError('imported')\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    result = check_module_importable("explodes_on_import")
+
+    assert result.passed is True
 
 
 def test_check_modules_importable_returns_one_per_name() -> None:
@@ -163,11 +192,6 @@ def test_format_report_marks_ok_and_fail() -> None:
 
 
 def test_check_cuda_available_returns_a_result() -> None:
-    # Without torch installed (CI) this should return a failure with the
-    # canonical message; with torch+CPU it should report no CUDA. Either
-    # way the function returns a CheckResult rather than crashing.
-    from anvil.preflight import check_cuda_available
-
     result = check_cuda_available()
 
     assert isinstance(result, CheckResult)
@@ -175,8 +199,6 @@ def test_check_cuda_available_returns_a_result() -> None:
 
 
 def test_check_compute_capability_returns_a_result_without_cuda() -> None:
-    from anvil.preflight import check_compute_capability
-
     result = check_compute_capability(min_major=8, min_minor=0)
 
     assert isinstance(result, CheckResult)

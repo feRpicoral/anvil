@@ -8,9 +8,9 @@ intervention; rehearse it on M1 first with `--rehearsal` (or
 ## Pod spec
 
 - **Template**: PyTorch 2.x base image (any recent NVIDIA / CUDA 12.x).
-- **GPU**: RunPod RTX 4090 24 GB (Community tier; ~$0.69/hr as of
+- **GPU**: RunPod RTX 4090 24 GB (Community tier; about $0.69/hr as of
   2026-05-27).
-- **Disk**: ≥40 GB volume (Llama 3.1 8B base + adapter + dataset + W&B
+- **Disk**: >=40 GB volume (Llama 3.1 8B base + adapter + dataset + W&B
   cache).
 - **Network**: outbound to `huggingface.co`, `api.openai.com`,
   `api.anthropic.com`, `api.wandb.ai`.
@@ -40,7 +40,7 @@ uv sync --group dev
 uv pip install -c constraints/train.txt unsloth trl peft transformers \
     accelerate datasets bitsandbytes
 
-# 2. Configure env. .env file or `export`s — pick one.
+# 2. Configure env. .env file or `export`s - pick one.
 export OPENAI_API_KEY=sk-...
 export HF_TOKEN=hf_...
 export WANDB_API_KEY=...
@@ -54,10 +54,9 @@ export CONFIRM_PAID=1
 
 After the run completes, copy these off the pod (gitignored locally):
 
-- `outputs/full/` — LoRA adapter + tokenizer.
-- `results/eval/smoke/` (or `results/eval/full/` once the paid eval slice
-  is wired) — per-variant scores + comparison.
-- `results/cost/` — cost report.
+- `outputs/full/` - LoRA adapter + tokenizer.
+- `results/eval/full/` - per-variant scores + comparison.
+- `results/cost/full.json` - cost report.
 
 ## Rehearsal
 

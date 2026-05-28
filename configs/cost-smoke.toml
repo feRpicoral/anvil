@@ -1,0 +1,19 @@
+output_path = "results/cost/smoke.json"
+eval_comparison_path = "results/eval/smoke/comparison.json"
+
+api_keys = ["gpt-4o", "claude-sonnet-4-6"]
+input_share = 0.5
+months_horizon = 12
+
+[training]
+gpu_hours = 4.0
+gpu_tier_key = "runpod-rtx-4090-community"
+synthesis_api_cost_usd = 54.0
+eval_api_cost_usd = 0.0
+
+[fine_tuned]
+label = "Llama 3.1 8B QLoRA on RTX 4090"
+gpu_tier_key = "runpod-rtx-4090-community"
+throughput_tps = 1100.0
+throughput_source = "Published Llama 3.1 8B AWQ on RTX 4090; refresh before quoting"
+utilization = 0.8

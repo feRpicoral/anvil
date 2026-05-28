@@ -79,6 +79,7 @@ hf_cache/
 results/scratch/
 results/eval/smoke/
 results/train/smoke/
+results/cost/
 
 # Local logs (root-anchored)
 /logs/

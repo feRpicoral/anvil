@@ -30,19 +30,21 @@ of typical extraction volume**.
 | ![Per-field comparison](docs/img/task-metric-comparison.png) | ![JSON validity](docs/img/json-validity.png) |
 | ![Cost per 1M tokens](docs/img/cost-per-1m.png) | ![Breakeven curve](docs/img/breakeven.png) |
 
-Training-loss curve is added after the paid run lands. Regenerate locally with
-`make chart` once `results/eval/` and `results/cost/` are populated.
+Training-loss curve is added after the paid run lands. `make chart` regenerates
+local chart outputs under `results/charts/`; refresh the committed README images
+with `uv run python -m scripts.chart --output-dir docs/img` after the source
+JSON files are populated.
 
 ## How to read this
 
-- **Per-field score**: macro-averaged accuracy across the eight critical
-  contract fields. The fine-tuned model closes the gap to GPT-4o on
-  every field; the base model is materially worse.
+- **Per-field score**: mean extraction score per contract field. The
+  fine-tuned model closes the gap to GPT-4o on every field; the base model is
+  materially worse.
 - **JSON validity**: fraction of model outputs that parse against the
   strict schema. This is the gate; F1 means nothing if the output doesn't
   parse.
 - **Cost per 1M tokens**: blended input/output. Self-hosted assumes a
-  published throughput estimate (see `anvil/cost/inference_cost.py`),
+  published throughput estimate configured in `configs/cost-*.toml`,
   not a measured number from the paid run.
 - **Breakeven**: months until the one-time training cost is paid back by
   the per-token savings vs. continuing to call GPT-4o.
@@ -54,9 +56,8 @@ Training-loss curve is added after the paid run lands. Regenerate locally with
 | Base model | `meta-llama/Llama-3.1-8B-Instruct` | Industry-standard, fits a 4090 at QLoRA, gated access validated |
 | PEFT | QLoRA (NF4 + LoRA) | Matches 16-bit quality at ~7 GB peak VRAM; only path that fits the budget |
 | Training framework | Unsloth (paid run), TRL `SFTTrainer` (M1 smoke) | Unsloth's fused kernels = 2× faster + 70% less VRAM; TRL is the M1 fallback |
-| Dataset synthesis | OpenAI GPT-4o (primary) + Anthropic Claude Sonnet 4.6 (5% diversity) | GPT-4o's strict structured outputs minimize schema-violation retries |
-| Real-world test slice | CUAD v1 (Atticus Project, CC BY 4.0) | Real M&A/corp-finance contracts under expert annotation |
-| Eval | Field-level P/R/F1 + JSON-validity rate + LLM-as-judge (secondary, with inter-judge variance) | Validity gates F1; judge is supplemental, not a release gate |
+| Dataset synthesis | OpenAI GPT-4o full run; fixture smoke run | GPT-4o's strict structured outputs minimize schema-violation retries; fixtures keep CI free |
+| Eval | Field-level scores + JSON-validity rate across base / fine-tuned / GPT-4o | Validity gates every score; unparsable output does not get credit |
 | GPU | RunPod RTX 4090 24 GB Community | Cheapest tier that fits Llama 3.1 8B at QLoRA |
 | Publishing | Hugging Face Hub (adapter + model card) | Standard distribution path |
 | HF demo | Gradio on Spaces ZeroGPU (in progress) | Free, low-friction interactive demo |
@@ -115,29 +116,26 @@ clone-install-run snippet. The orchestrator is one command:
 ./deploy/runpod-train.sh --full       # needs CONFIRM_PAID=1 + tokens
 ```
 
-The full pipeline is budget-capped (~$120 envelope: synthesis ≈ $55, training
-≈ $1–5, eval ≈ $20, judge ≈ $10, contingency 25%). Synthesis aborts at the
-hard cap before any training spend is incurred.
+The full pipeline is budget-capped (~$100 envelope: synthesis ≈ $55, training
+≈ $1-5, eval ≈ $20, contingency 25%). Synthesis aborts at the hard cap before
+any training spend is incurred.
 
 ## Methodology
 
-- **Data**: ≈4k synthetic NDAs/MSAs/licenses synthesized via GPT-4o with
-  strict JSON-schema enforcement (5% diversity slice from Claude Sonnet 4.6
-  to avoid single-model mode collapse). A ~75-sample hand-curated slice
-  from [CUAD v1](https://www.atticusprojectai.org/cuad) is held out as the
-  real-world test set. Anti-contamination guard hashes normalized contract
-  text and aborts if any sample appears in two splits.
+- **Data**: 4k synthetic NDAs/MSAs/licenses synthesized via GPT-4o with
+  strict JSON-schema enforcement, then curated, stratified, and split into
+  train/val/test. Anti-contamination guard hashes normalized contract text
+  and aborts if any sample appears in two splits.
 - **Training**: 3 epochs of QLoRA (NF4 + LoRA, rank 16, alpha 32,
   `all_linear` target modules) on Llama 3.1 8B via Unsloth on a single
   4090. ~2 wall-clock hours, ~$1 of GPU time.
-- **Eval**: per-field precision/recall/F1 over the held-out CUAD slice
-  plus JSON validity. LLM-as-judge (N=3 passes with reported inter-judge
-  variance) is secondary, never a release gate, because judges are
-  documented to be inconsistent across cosmetic format changes
-  ([Chehbouni et al. 2025](https://arxiv.org/pdf/2510.27106)).
+- **Eval**: base, fine-tuned, and GPT-4o predictors run over the same held-out
+  synthetic test split. The report captures JSON validity, field-level scores,
+  token totals, latency, and API cost.
 - **Cost**: training $ = GPU-hours × hourly + synthesis API + eval API.
-  Inference $ per 1M tokens = published throughput / GPU price. Breakeven
-  volume = amortized training / (API per-1M − self-hosted per-1M).
+  Self-hosted inference $ per 1M tokens comes from GPU hourly price,
+  sustained throughput, and utilization. Breakeven volume = amortized
+  training / (API per-1M − self-hosted per-1M).
   Forge's measured throughput numbers are deliberately not quoted until
   Forge's own paid run lands; Anvil cites a published Llama 3.1 8B + 4090
   source instead.

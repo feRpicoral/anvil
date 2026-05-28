@@ -4,12 +4,13 @@ Each function takes typed inputs and returns a `matplotlib.figure.Figure`.
 Callers save it (`fig.savefig(...)`); the chart pipeline (`scripts/chart.py`,
 arriving next) wires them to JSON inputs and writes PNGs under `results/charts/`.
 
-The functions don't apply the project stylesheet — call
+The functions don't apply the project stylesheet - call
 `anvil.plots.style.apply_style()` once at the top of your script.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -28,6 +29,12 @@ class LossSample:
     step: int
     train_loss: float
     val_loss: float | None = None
+
+    def __post_init__(self) -> None:
+        _non_negative_int("step", self.step)
+        _non_negative_finite("train_loss", self.train_loss)
+        if self.val_loss is not None:
+            _non_negative_finite("val_loss", self.val_loss)
 
 
 def training_loss_curve(history: Sequence[LossSample]) -> Figure:
@@ -71,21 +78,26 @@ def task_metric_comparison(
     if not per_variant_field_scores:
         raise ValueError("per_variant_field_scores must be non-empty")
     variants = list(per_variant_field_scores.keys())
+    _validate_labels("variant", variants)
     if fields is None:
-        # Stable order: union of fields across variants, sorted.
         field_set: set[str] = set()
         for variant_scores in per_variant_field_scores.values():
             field_set.update(variant_scores.keys())
         fields = sorted(field_set)
     if not fields:
         raise ValueError("at least one field score is required")
+    fields = tuple(fields)
+    _validate_labels("field", fields)
 
     colors = palette()
     fig, ax = plt.subplots(figsize=(10.0, 5.0))
     width = 0.8 / len(variants)
     positions = list(range(len(fields)))
     for index, variant in enumerate(variants):
-        bar_heights = [per_variant_field_scores[variant].get(field, 0.0) for field in fields]
+        bar_heights = [
+            _rate(f"{variant}.{field}", per_variant_field_scores[variant].get(field, 0.0))
+            for field in fields
+        ]
         offset = (index - (len(variants) - 1) / 2) * width
         ax.bar(
             [p + offset for p in positions],
@@ -109,7 +121,8 @@ def json_validity_rate(per_variant_rate: dict[str, float]) -> Figure:
         raise ValueError("per_variant_rate must be non-empty")
     colors = palette()
     variants = list(per_variant_rate.keys())
-    rates = [per_variant_rate[v] for v in variants]
+    _validate_labels("variant", variants)
+    rates = [_rate(variant, per_variant_rate[variant]) for variant in variants]
     fig, ax = plt.subplots()
     bar_colors = [_variant_color(v, colors) for v in variants]
     bars = ax.bar(variants, rates, color=bar_colors)
@@ -134,7 +147,8 @@ def cost_per_1m_tokens(comparison: CostComparison) -> Figure:
         raise ValueError("comparison must contain at least one scenario")
     colors = palette()
     labels = [row.label for row in rows]
-    values = [row.usd_per_1m_tokens for row in rows]
+    _validate_labels("scenario", labels)
+    values = [_non_negative_finite(row.label, row.usd_per_1m_tokens) for row in rows]
     bar_colors = [
         colors["self_hosted"] if index < len(comparison.self_hosted) else colors["api_blended"]
         for index in range(len(rows))
@@ -163,8 +177,9 @@ def breakeven_curve(
     """Two lines: cumulative cost month-by-month for fine-tuned vs. API."""
     if not points:
         raise ValueError("points must contain at least one BreakevenPoint")
-    if monthly_volume_m_tokens < 0:
-        raise ValueError("monthly_volume_m_tokens must be non-negative")
+    _non_negative_finite("monthly_volume_m_tokens", monthly_volume_m_tokens)
+    _validate_labels("primary_api_label", (primary_api_label,))
+    _validate_breakeven_points(points)
     colors = palette()
     months = [p.month for p in points]
     fig, ax = plt.subplots()
@@ -217,3 +232,49 @@ def _first_crossover(points: Sequence[BreakevenPoint]) -> int | None:
         if point.cumulative_api_usd >= point.cumulative_finetuned_usd:
             return point.month
     return None
+
+
+def _validate_breakeven_points(points: Sequence[BreakevenPoint]) -> None:
+    previous_month: int | None = None
+    for index, point in enumerate(points):
+        month = _non_negative_int(f"points[{index}].month", point.month)
+        _non_negative_finite(
+            f"points[{index}].cumulative_finetuned_usd",
+            point.cumulative_finetuned_usd,
+        )
+        _non_negative_finite(
+            f"points[{index}].cumulative_api_usd",
+            point.cumulative_api_usd,
+        )
+        if previous_month is not None and month <= previous_month:
+            raise ValueError("points must be ordered by strictly increasing month")
+        previous_month = month
+
+
+def _validate_labels(label: str, values: Sequence[str]) -> None:
+    for index, value in enumerate(values):
+        if not value:
+            raise ValueError(f"{label}[{index}] must be a non-empty string")
+
+
+def _rate(name: str, value: object) -> float:
+    rate = _non_negative_finite(name, value)
+    if rate > 1.0:
+        raise ValueError(f"{name} must be between 0 and 1")
+    return rate
+
+
+def _non_negative_int(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be a non-negative integer, got {value!r}")
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative integer, got {value}")
+    return value
+
+
+def _non_negative_finite(name: str, value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a non-negative finite number, got {value!r}")
+    if value < 0:
+        raise ValueError(f"{name} must be a non-negative finite number, got {value}")
+    return float(value)

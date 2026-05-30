@@ -82,6 +82,29 @@ def test_generate_computes_cost_from_pricing() -> None:
     assert result.cost_usd == pytest.approx(2.50 + 10.00)
 
 
+def test_generate_retries_schema_invalid_response() -> None:
+    invalid = {"contract_text": "ok", "extraction": {}}
+    valid = _valid_payload()
+    client = MagicMock()
+    create = AsyncMock(
+        side_effect=[
+            _fake_response(json.dumps(invalid), prompt_tokens=10, completion_tokens=20),
+            _fake_response(json.dumps(valid), prompt_tokens=30, completion_tokens=40),
+        ]
+    )
+    client.chat.completions.create = create
+    generator = OpenAIGenerator(client=client)
+
+    result = asyncio.run(generator.generate("nda", "sys", "user", seed=42))
+
+    assert create.await_count == 2
+    seeds = [call.kwargs["seed"] for call in create.await_args_list]
+    assert seeds == [42, 43]
+    assert result.input_tokens == 40
+    assert result.output_tokens == 60
+    assert result.extraction == valid["extraction"]
+
+
 def test_generate_passes_seed_and_response_format_to_api() -> None:
     generator, create = _make_generator(json.dumps(_valid_payload()))
 
@@ -146,5 +169,5 @@ def test_generate_raises_when_extraction_not_object() -> None:
 def test_generate_raises_when_extraction_fails_schema() -> None:
     generator, _ = _make_generator(json.dumps({"contract_text": "ok", "extraction": {}}))
 
-    with pytest.raises(RuntimeError, match="extraction does not match schema"):
+    with pytest.raises(RuntimeError, match="did not validate"):
         asyncio.run(generator.generate("nda", "sys", "user", seed=0))

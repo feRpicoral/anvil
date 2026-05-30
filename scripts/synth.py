@@ -42,6 +42,14 @@ class BudgetExceededError(RuntimeError):
         self.partial_results = tuple(partial_results)
 
 
+class SynthesisFailedError(RuntimeError):
+    """Raised when generation fails after preserving completed records."""
+
+    def __init__(self, message: str, partial_results: Sequence[GenerationResult]) -> None:
+        super().__init__(message)
+        self.partial_results = tuple(partial_results)
+
+
 @dataclasses.dataclass(frozen=True)
 class SynthConfig:
     backend: str
@@ -139,12 +147,18 @@ async def synthesize(
         contract_type: ContractType = CONTRACT_TYPES[index % len(CONTRACT_TYPES)]
         parameters = factory(contract_type, index, base_seed)
         user_prompt = render_user_prompt(parameters)
-        result = await generator.generate(
-            contract_type=contract_type,
-            system_prompt=sys_prompt,
-            user_prompt=user_prompt,
-            seed=base_seed + index,
-        )
+        try:
+            result = await generator.generate(
+                contract_type=contract_type,
+                system_prompt=sys_prompt,
+                user_prompt=user_prompt,
+                seed=base_seed + index,
+            )
+        except Exception as exc:
+            raise SynthesisFailedError(
+                f"generation failed at sample {index + 1}/{num_samples}",
+                results,
+            ) from exc
         results.append(result)
         total_cost += result.cost_usd
         if max_spend_usd is not None and total_cost > max_spend_usd:
@@ -181,6 +195,13 @@ def run(args: argparse.Namespace) -> int:
     except BudgetExceededError as exc:
         write_raw_jsonl(exc.partial_results, output_path)
         print(f"synth: ABORT — {exc}", file=sys.stderr)
+        raise
+    except SynthesisFailedError as exc:
+        write_raw_jsonl(exc.partial_results, output_path)
+        print(
+            f"synth: ABORT — {exc}; wrote {len(exc.partial_results)} partial records",
+            file=sys.stderr,
+        )
         raise
     write_raw_jsonl(results, output_path)
     total_cost = sum(result.cost_usd for result in results)

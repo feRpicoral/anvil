@@ -63,11 +63,11 @@ def _api_pricing(name: str, prices: tuple[float, float]) -> ApiPricing:
 
 
 GPU_TIERS: dict[str, GpuTier] = {
-    "runpod-rtx-4090-community": GpuTier(
-        name="RunPod RTX 4090 (Community)",
-        hourly_usd=0.69,
+    "runpod-rtx-a5000-community": GpuTier(
+        name="RunPod RTX A5000 (Community)",
+        hourly_usd=0.27,
         vram_gb=24,
-        notes="The benchmark target. Fits Llama 3.1 8B BF16 + KV cache headroom.",
+        notes="The paid-run target. Fits Llama 3.1 8B QLoRA on a budget 24 GB pod.",
     ),
     "runpod-a100-pcie-80gb-community": GpuTier(
         name="RunPod A100 PCIe 80GB (Community)",

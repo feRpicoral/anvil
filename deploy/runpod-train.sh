@@ -21,6 +21,16 @@ USAGE
     exit 1
 }
 
+if [[ -d /workspace ]]; then
+    export HF_HOME="${HF_HOME:-/workspace/.cache/huggingface}"
+    export XDG_CACHE_HOME="${XDG_CACHE_HOME:-/workspace/.cache}"
+    export UV_CACHE_DIR="${UV_CACHE_DIR:-/workspace/.cache/uv}"
+    export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+    export WANDB_DIR="${WANDB_DIR:-/workspace/wandb}"
+    export TMPDIR="${TMPDIR:-/workspace/tmp}"
+    mkdir -p "$HF_HOME" "$XDG_CACHE_HOME" "$UV_CACHE_DIR" "$WANDB_DIR" "$TMPDIR"
+fi
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --rehearsal) REHEARSAL=1; shift ;;

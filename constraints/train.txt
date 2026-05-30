@@ -15,6 +15,7 @@
 # Ranges come from the compatibility matrix; refresh after the first
 # successful install on each platform.
 
+numpy<2.3
 trl<1.0
 peft>=0.13,<0.20
 transformers>=4.50,<5.0

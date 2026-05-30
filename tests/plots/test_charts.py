@@ -212,8 +212,8 @@ def test_json_validity_rate_rejects_invalid_rates(
 
 def test_cost_per_1m_tokens_renders_one_bar_per_scenario() -> None:
     sh = build_self_hosted(
-        label="Llama 3.1 8B on 4090",
-        gpu_tier_key="runpod-rtx-4090-community",
+        label="Llama 3.1 8B on A5000",
+        gpu_tier_key="runpod-rtx-a5000-community",
         sustained_throughput_tps=2100.0,
     )
     comparison = compare([sh], ["gpt-4o", "claude-sonnet-4-6"])

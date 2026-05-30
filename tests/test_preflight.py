@@ -16,6 +16,7 @@ from anvil.preflight import (
     check_env_vars,
     check_module_importable,
     check_modules_importable,
+    check_package_version_below,
     format_report,
     run_preflight,
 )
@@ -118,6 +119,27 @@ def test_check_modules_importable_returns_one_per_name() -> None:
     results = check_modules_importable(["json", "totally_fake"])
 
     assert [r.passed for r in results] == [True, False]
+
+
+def test_check_package_version_below_passes_for_installed_package() -> None:
+    result = check_package_version_below("numpy", upper_major=999, upper_minor=0)
+
+    assert result.passed is True
+    assert result.name == "version:numpy"
+
+
+def test_check_package_version_below_fails_for_missing_package() -> None:
+    result = check_package_version_below("totally-not-a-real-dist", upper_major=2, upper_minor=3)
+
+    assert result.passed is False
+    assert "not found" in result.detail
+
+
+def test_check_package_version_below_fails_when_version_is_too_high() -> None:
+    result = check_package_version_below("numpy", upper_major=0, upper_minor=1)
+
+    assert result.passed is False
+    assert "need <0.1" in result.detail
 
 
 def test_preflight_report_all_passed_true_when_all_pass() -> None:

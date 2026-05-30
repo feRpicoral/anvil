@@ -14,6 +14,7 @@ from anvil.data.synthesis import GenerationResult
 from scripts.synth import (
     BudgetExceededError,
     SynthConfig,
+    SynthesisFailedError,
     build_generator,
     load_config,
     run,
@@ -47,6 +48,18 @@ class _CountingGenerator:
             cost_usd=self.cost_usd,
             backend="stub",
         )
+
+
+class _FailingGenerator:
+    async def generate(
+        self,
+        contract_type: str,
+        system_prompt: str,
+        user_prompt: str,
+        seed: int,
+    ) -> GenerationResult:
+        del contract_type, system_prompt, user_prompt, seed
+        raise RuntimeError("boom")
 
 
 def _write_paid_config(tmp_path: Path, **overrides: Any) -> Path:
@@ -193,6 +206,28 @@ def test_synthesize_completes_when_under_cap() -> None:
     assert generator.calls == 5
 
 
+def test_synthesize_preserves_completed_results_when_generation_fails() -> None:
+    generator = _CountingGenerator(cost_usd=0.0)
+    original_generate = generator.generate
+
+    async def fail_on_second(
+        contract_type: str,
+        system_prompt: str,
+        user_prompt: str,
+        seed: int,
+    ) -> GenerationResult:
+        if generator.calls == 1:
+            raise RuntimeError("boom")
+        return await original_generate(contract_type, system_prompt, user_prompt, seed)
+
+    generator.generate = fail_on_second  # type: ignore[method-assign]
+
+    with pytest.raises(SynthesisFailedError, match="sample 2/3") as exc_info:
+        asyncio.run(synthesize(generator, num_samples=3, base_seed=0))
+
+    assert len(exc_info.value.partial_results) == 1
+
+
 def test_run_surfaces_budget_exceeded_error(tmp_path: Path) -> None:
     config_path = _write_paid_config(tmp_path, max_spend_usd=0.1, num_samples=5)
     args = argparse.Namespace(config=config_path)
@@ -215,3 +250,16 @@ def test_run_persists_partial_results_when_budget_exceeded(tmp_path: Path) -> No
     output = tmp_path / "out" / "raw_synthesis.jsonl"
     rows = output.read_text(encoding="utf-8").splitlines()
     assert len(rows) == 3
+
+
+def test_run_persists_partial_results_when_generation_fails(tmp_path: Path) -> None:
+    config_path = _write_paid_config(tmp_path, num_samples=5)
+    args = argparse.Namespace(config=config_path)
+
+    with patch("scripts.synth.build_generator") as build:
+        build.return_value = _FailingGenerator()
+        with pytest.raises(SynthesisFailedError):
+            run(args)
+
+    output = tmp_path / "out" / "raw_synthesis.jsonl"
+    assert output.read_text(encoding="utf-8") == ""

@@ -30,6 +30,7 @@ from anvil.data.synthesis import (
 )
 
 _DEFAULT_MODEL = "gpt-4o-2024-08-06"
+_DEFAULT_MAX_ATTEMPTS = 3
 
 
 class OpenAIGenerator:
@@ -41,11 +42,15 @@ class OpenAIGenerator:
         api_key: str | None = None,
         model: str = _DEFAULT_MODEL,
         client: AsyncOpenAI | None = None,
+        max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     ) -> None:
         if model not in OPENAI_PRICES:
             raise ValueError(f"unknown OpenAI model for pricing: {model!r}")
+        if max_attempts <= 0:
+            raise ValueError("max_attempts must be positive")
         self._model = model
         self._client = client if client is not None else AsyncOpenAI(api_key=api_key)
+        self._max_attempts = max_attempts
 
     @property
     def model(self) -> str:
@@ -69,31 +74,45 @@ class OpenAIGenerator:
             "schema": schema["schema"],
         }
         response_format = ResponseFormatJSONSchema(type="json_schema", json_schema=json_schema)
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=messages,
-            response_format=response_format,
-            seed=seed,
-        )
-        choice = response.choices[0]
-        refusal = getattr(choice.message, "refusal", None)
-        if refusal:
-            raise RuntimeError(f"OpenAI refused generation: {refusal}")
-        content = choice.message.content or ""
-        payload = _parse_payload(content)
-        usage = response.usage
-        input_tokens = usage.prompt_tokens if usage else 0
-        output_tokens = usage.completion_tokens if usage else 0
-        cost = compute_cost_usd(OPENAI_PRICES[self._model], input_tokens, output_tokens)
-        return GenerationResult(
-            contract_type=contract_type,
-            contract_text=payload["contract_text"],
-            extraction=payload["extraction"],
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            cost_usd=cost,
-            backend=f"openai:{self._model}",
-        )
+        input_tokens = 0
+        output_tokens = 0
+        last_validation_error: Exception | None = None
+        for attempt in range(self._max_attempts):
+            response = await self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                response_format=response_format,
+                seed=seed + attempt,
+            )
+            choice = response.choices[0]
+            usage = response.usage
+            input_tokens += usage.prompt_tokens if usage else 0
+            output_tokens += usage.completion_tokens if usage else 0
+            refusal = getattr(choice.message, "refusal", None)
+            if refusal:
+                raise RuntimeError(f"OpenAI refused generation: {refusal}")
+            content = choice.message.content or ""
+            try:
+                payload = _parse_payload(content)
+            except (json.JSONDecodeError, RuntimeError) as exc:
+                last_validation_error = exc
+                if attempt + 1 == self._max_attempts:
+                    raise RuntimeError(
+                        f"OpenAI response did not validate after {self._max_attempts} attempts: "
+                        f"{exc}"
+                    ) from exc
+                continue
+            cost = compute_cost_usd(OPENAI_PRICES[self._model], input_tokens, output_tokens)
+            return GenerationResult(
+                contract_type=contract_type,
+                contract_text=payload["contract_text"],
+                extraction=payload["extraction"],
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=cost,
+                backend=f"openai:{self._model}",
+            )
+        raise RuntimeError("OpenAI generation exhausted retry loop") from last_validation_error
 
 
 def _parse_payload(content: str) -> dict[str, Any]:

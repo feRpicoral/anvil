@@ -1,7 +1,7 @@
-# Eval-time constraints.
+# Eval-time constraints for ad hoc paid-eval installs.
 #
-# Minimal set: OpenAI / Anthropic clients for the big-model baseline + LLM-
-# as-judge, plus a structured-output validator for JSON-validity scoring.
-# vLLM is only invoked transiently for the paid eval run (to serve the
-# fine-tuned model for batch inference) and is installed at that point
-# using Forge's constraints/serve.txt.
+# The base project already carries the API clients and schema validators.
+# Keep NumPy below 2.3 so CUDA/eval transitive deps do not drift into the
+# resolver mismatch hit during the Forge RunPod run.
+
+numpy<2.3

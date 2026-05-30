@@ -1,7 +1,7 @@
 """Backend-agnostic QLoRA training config.
 
 The same `TrainingConfig` drives both the M1 smoke (TRL `SFTTrainer` +
-non-quantized LoRA) and the paid run (Unsloth + QLoRA on a 4090). The
+non-quantized LoRA) and the paid run (Unsloth + QLoRA on an A5000). The
 config does not import any CUDA-coupled module so it can be parsed,
 validated, and tested under the regular `uv sync` install on macOS;
 the actual trainer wiring lives in a separate driver that imports

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import math
+import re
 import shutil
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 
@@ -86,6 +88,24 @@ def check_modules_importable(names: Sequence[str]) -> list[CheckResult]:
     return [check_module_importable(name) for name in names]
 
 
+def check_package_version_below(name: str, upper_major: int, upper_minor: int) -> CheckResult:
+    try:
+        raw_version = version(name)
+    except PackageNotFoundError:
+        return CheckResult(name=f"version:{name}", passed=False, detail="package not found")
+    parsed = _major_minor(raw_version)
+    if parsed is None:
+        return CheckResult(
+            name=f"version:{name}", passed=False, detail=f"unparseable {raw_version}"
+        )
+    passed = parsed < (upper_major, upper_minor)
+    return CheckResult(
+        name=f"version:{name}",
+        passed=passed,
+        detail=f"{raw_version} (need <{upper_major}.{upper_minor})",
+    )
+
+
 def check_cuda_available() -> CheckResult:
     """Check that `torch.cuda.is_available()` returns True."""
     try:
@@ -101,7 +121,7 @@ def check_cuda_available() -> CheckResult:
 def check_compute_capability(min_major: int, min_minor: int) -> CheckResult:
     """Check device 0 has compute capability >= (min_major, min_minor).
 
-    RTX 4090 is (8, 9); A100 is (8, 0); H100 is (9, 0).
+    RTX A5000 is (8, 6); A100 is (8, 0); H100 is (9, 0).
     """
     try:
         import torch
@@ -156,16 +176,42 @@ def rehearsal_checks() -> list[CheckResult]:
 
 
 def full_run_checks() -> list[CheckResult]:
-    """Checks the paid GPU run needs: tokens, training stack, CUDA + 4090."""
+    """Checks the paid GPU run needs: tokens, training stack, CUDA + A5000."""
     import os
 
     checks: list[CheckResult] = []
     checks.extend(check_env_vars(["OPENAI_API_KEY", "HF_TOKEN", "WANDB_API_KEY"], os.environ))
-    checks.append(check_disk_space(Path.cwd(), min_gb=20.0))
-    checks.extend(check_modules_importable(["torch", "transformers", "trl", "peft", "datasets"]))
+    checks.extend(
+        check_env_vars(
+            ["HF_HOME", "UV_CACHE_DIR", "UV_LINK_MODE", "WANDB_DIR", "TMPDIR"],
+            os.environ,
+        )
+    )
+    checks.append(check_disk_space(Path.cwd(), min_gb=80.0))
+    checks.extend(
+        check_modules_importable(
+            [
+                "torch",
+                "transformers",
+                "trl",
+                "peft",
+                "datasets",
+                "bitsandbytes",
+                "unsloth",
+            ]
+        )
+    )
+    checks.append(check_package_version_below("numpy", upper_major=2, upper_minor=3))
     checks.append(check_cuda_available())
     checks.append(check_compute_capability(min_major=8, min_minor=0))
     return checks
+
+
+def _major_minor(value: str) -> tuple[int, int] | None:
+    match = re.match(r"^(\d+)\.(\d+)", value)
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2))
 
 
 def _nearest_existing_path(path: Path) -> Path:

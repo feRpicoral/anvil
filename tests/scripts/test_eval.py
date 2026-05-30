@@ -310,4 +310,4 @@ def test_full_config_file_loads() -> None:
     assert config.test_jsonl == Path("data/full/test.jsonl")
     assert config.output_dir == Path("results/eval/full")
     assert [v.predictor for v in config.variants] == ["local", "local", "openai"]
-    assert config.variants[1].adapter_path == Path("outputs/full")
+    assert config.variants[1].adapter_path == Path("outputs/full/final")

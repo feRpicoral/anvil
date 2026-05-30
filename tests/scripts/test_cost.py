@@ -65,13 +65,13 @@ months_horizon = 12
 
 [training]
 gpu_hours = 4.0
-gpu_tier_key = "runpod-rtx-a5000-community"
+gpu_tier_key = "runpod-a40-community"
 synthesis_api_cost_usd = 54.0
 eval_api_cost_usd = 0.0
 
 [fine_tuned]
-label = "Llama 3.1 8B QLoRA on RTX A5000"
-gpu_tier_key = "runpod-rtx-a5000-community"
+label = "Llama 3.1 8B QLoRA on A40"
+gpu_tier_key = "runpod-a40-community"
 throughput_tps = 1100.0
 throughput_source = "Published benchmark, refresh before quoting"
 utilization = 0.8
@@ -92,7 +92,7 @@ def test_load_cost_config_minimal(tmp_path: Path) -> None:
 
 def test_load_cost_config_rejects_unknown_gpu_tier(tmp_path: Path) -> None:
     body = _smoke_body(tmp_path).replace(
-        '"runpod-rtx-a5000-community"',
+        '"runpod-a40-community"',
         '"made-up-tier"',
     )
     config_path = _write_config(tmp_path, body)
@@ -247,13 +247,13 @@ months_horizon = 12
 
 [training]
 gpu_hours = 0.0
-gpu_tier_key = "runpod-rtx-a5000-community"
+gpu_tier_key = "runpod-a40-community"
 synthesis_api_cost_usd = 120.0
 eval_api_cost_usd = 0.0
 
 [fine_tuned]
 label = "test"
-gpu_tier_key = "runpod-rtx-a5000-community"
+gpu_tier_key = "runpod-a40-community"
 throughput_tps = 100000.0
 throughput_source = "synthetic, for test"
 utilization = 1.0
@@ -292,7 +292,7 @@ def test_smoke_config_file_loads() -> None:
     config = load_cost_config(Path("configs/cost-smoke.toml"))
 
     assert isinstance(config, CostConfig)
-    assert config.training_gpu_tier_key == "runpod-rtx-a5000-community"
+    assert config.training_gpu_tier_key == "runpod-a40-community"
     assert config.months_horizon == 12
 
 

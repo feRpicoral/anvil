@@ -7,13 +7,13 @@ months_horizon = 12
 
 [training]
 gpu_hours = 4.0
-gpu_tier_key = "runpod-rtx-a5000-community"
+gpu_tier_key = "runpod-a40-community"
 synthesis_api_cost_usd = 54.0
 eval_api_cost_usd = 0.0
 
 [fine_tuned]
-label = "Llama 3.1 8B QLoRA on RTX A5000"
-gpu_tier_key = "runpod-rtx-a5000-community"
+label = "Llama 3.1 8B QLoRA on A40"
+gpu_tier_key = "runpod-a40-community"
 throughput_tps = 1100.0
-throughput_source = "Illustrative pre-run A5000 throughput estimate; replace before quoting"
+throughput_source = "Illustrative pre-run A40 throughput estimate; replace before quoting"
 utilization = 0.8

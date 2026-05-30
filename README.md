@@ -56,12 +56,12 @@ JSON files are populated.
 
 | Layer | Choice | Why |
 |---|---|---|
-| Base model | `meta-llama/Llama-3.1-8B-Instruct` | Industry-standard, fits an A5000 at QLoRA, gated access validated |
+| Base model | `meta-llama/Llama-3.1-8B-Instruct` | Industry-standard, fits an A40 at QLoRA, gated access validated |
 | PEFT | QLoRA (NF4 + LoRA) | Matches 16-bit quality at ~7 GB peak VRAM; only path that fits the budget |
 | Training framework | Unsloth (paid run), TRL `SFTTrainer` (M1 smoke) | Unsloth's fused kernels = 2× faster + 70% less VRAM; TRL is the M1 fallback |
 | Dataset synthesis | OpenAI GPT-4o full run; fixture smoke run | GPT-4o's strict structured outputs minimize schema-violation retries; fixtures keep CI free |
 | Eval | Field-level scores + JSON-validity rate across base / fine-tuned / GPT-4o | Validity gates every score; unparsable output does not get credit |
-| GPU | RunPod RTX A5000 24 GB Community | Existing budget 24 GB tier that fits Llama 3.1 8B at QLoRA |
+| GPU | RunPod A40 48 GB Community | Actual paid-run pod at $0.44/hr with headroom for Llama 3.1 8B QLoRA |
 | Publishing | Hugging Face Hub (adapter + model card) | Standard distribution path |
 | HF demo | Gradio on Spaces ZeroGPU ([`deploy/hf-spaces/`](deploy/hf-spaces/)) | Free, low-friction three-way side-by-side |
 
@@ -71,7 +71,7 @@ JSON files are populated.
 flowchart TD
     Data["<b>data-smoke / data-full</b><br/>synth (fixture · OpenAI · Anthropic)<br/>curate (length + language + schema + dedup)<br/>split (stratified, anti-contamination hash guard)<br/>format (chat-template messages JSONL)"]
     DataOut[("data/{smoke,full}/{train,val,test}.jsonl")]
-    Train["<b>train</b><br/>TRL on M1, Unsloth on A5000<br/>shared TrainingConfig dataclass"]
+    Train["<b>train</b><br/>TRL on M1, Unsloth on A40<br/>shared TrainingConfig dataclass"]
     TrainOut[("outputs/{smoke,full}/final/ (LoRA adapter)")]
     Eval["<b>eval</b><br/>three predictors behind one Protocol:<br/>FixturePredictor · LocalExtractionPredictor · OpenAIExtractionPredictor"]
     EvalOut[("results/eval/{smoke,full}/comparison.json")]
@@ -114,7 +114,7 @@ any training spend is incurred.
   and aborts if any sample appears in two splits.
 - **Training**: 3 epochs of QLoRA (NF4 + LoRA, rank 16, alpha 32,
   `all_linear` target modules) on Llama 3.1 8B via Unsloth on a single
-  RTX A5000. ~2-4 wall-clock hours, roughly $1 of GPU time before storage.
+  A40. ~2-4 wall-clock hours, roughly $1-2 of GPU time before storage.
 - **Eval**: base, fine-tuned, and GPT-4o predictors run over the same held-out
   synthetic test split. The report captures JSON validity, field-level scores,
   token totals, latency, and API cost.
@@ -123,7 +123,7 @@ any training spend is incurred.
   sustained throughput, and utilization. Breakeven volume = amortized
   training / (API per-1M − self-hosted per-1M).
   Anvil's README keeps the current cost chart illustrative until the paid
-  A5000 run replaces the placeholder throughput estimate.
+  A40 run replaces the placeholder throughput estimate.
 
 ## Project layout
 

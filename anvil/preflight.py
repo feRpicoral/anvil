@@ -121,7 +121,7 @@ def check_cuda_available() -> CheckResult:
 def check_compute_capability(min_major: int, min_minor: int) -> CheckResult:
     """Check device 0 has compute capability >= (min_major, min_minor).
 
-    RTX A5000 is (8, 6); A100 is (8, 0); H100 is (9, 0).
+    A40 is (8, 6); A100 is (8, 0); H100 is (9, 0).
     """
     try:
         import torch
@@ -176,7 +176,7 @@ def rehearsal_checks() -> list[CheckResult]:
 
 
 def full_run_checks() -> list[CheckResult]:
-    """Checks the paid GPU run needs: tokens, training stack, CUDA + A5000."""
+    """Checks the paid GPU run needs: tokens, training stack, CUDA + Ampere."""
     import os
 
     checks: list[CheckResult] = []

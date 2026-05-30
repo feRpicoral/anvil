@@ -13,7 +13,8 @@ working notes; before any paid run that quotes these numbers, refresh both
 tables against current rates and re-run the chart pipeline.
 
 Sources:
-- RunPod community tier pricing: https://runpod.io/pricing (as of 2026-05-27)
+- RunPod community tier pricing: https://runpod.io/pricing (A40 as shown in
+  RunPod pod selection on 2026-05-30)
 - OpenAI API pricing:            https://openai.com/api/pricing (as of 2026-05-27)
 - Anthropic Claude API pricing:  https://www.anthropic.com/pricing (as of 2026-05-27)
 """
@@ -63,11 +64,11 @@ def _api_pricing(name: str, prices: tuple[float, float]) -> ApiPricing:
 
 
 GPU_TIERS: dict[str, GpuTier] = {
-    "runpod-rtx-a5000-community": GpuTier(
-        name="RunPod RTX A5000 (Community)",
-        hourly_usd=0.27,
-        vram_gb=24,
-        notes="The paid-run target. Fits Llama 3.1 8B QLoRA on a budget 24 GB pod.",
+    "runpod-a40-community": GpuTier(
+        name="RunPod A40 (Community)",
+        hourly_usd=0.44,
+        vram_gb=48,
+        notes="The paid-run target. Fits Llama 3.1 8B QLoRA with 48 GB VRAM headroom.",
     ),
     "runpod-a100-pcie-80gb-community": GpuTier(
         name="RunPod A100 PCIe 80GB (Community)",

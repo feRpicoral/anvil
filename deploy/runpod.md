@@ -9,8 +9,8 @@ before starting the pod.
 
 | Setting | Value | Why |
 |---|---|---|
-| GPU | **RTX A5000 24 GB** | Existing 24 GB pod; enough for Llama 3.1 8B QLoRA. |
-| Image | PyTorch 2.x base image with CUDA 12.x+ | Keeps CUDA, Python, and PyTorch aligned before installing Unsloth. |
+| GPU | **A40 48 GB at $0.44/hr** | Actual paid-run pod; enough headroom for Llama 3.1 8B QLoRA. |
+| Image | `runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04` | Known-good CUDA 12.4 / PyTorch 2.4 base before installing Unsloth. |
 | Container disk | **20 GB** | Keep model weights, uv cache, W&B, temp files, and outputs off this disk. |
 | Volume | **100 GB mounted at `/workspace`** | Room for Llama cache, synthesized data, checkpoints, final adapter, W&B, logs, and transfer archives. |
 | Network | outbound to `huggingface.co`, `api.openai.com`, `api.wandb.ai` | Required for model access, synthesis/eval, and telemetry. |
@@ -113,8 +113,8 @@ print("unsloth", getattr(unsloth, "__version__", "installed"))
 PY
 ```
 
-Expected: NumPy is below `2.3`, CUDA is available, and the GPU is the RTX
-A5000. If NumPy is `2.3+`, rerun the install command above before starting the
+Expected: NumPy is below `2.3`, CUDA is available, and the GPU is the
+A40. If NumPy is `2.3+`, rerun the install command above before starting the
 paid run.
 
 Verify Hugging Face access without printing the token:

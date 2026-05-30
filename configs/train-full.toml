@@ -1,6 +1,6 @@
 # Paid training config: Unsloth + Llama 3.1 8B Instruct + NF4 + 3 epochs.
 #
-# Target: RunPod RTX A5000 24 GB. Requires the full Linux + CUDA training
+# Target: RunPod A40 48 GB. Requires the full Linux + CUDA training
 # stack via constraints/train.txt and HF_TOKEN with Llama gating granted.
 # Triggered via:
 #

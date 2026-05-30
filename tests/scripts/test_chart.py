@@ -62,7 +62,7 @@ def _write_cost_report(path: Path) -> Path:
         "training_cost": {"total_usd": 56.76},
         "inference_cost": {
             "self_hosted": [
-                {"label": "Llama 3.1 8B on A5000", "usd_per_1m_tokens": 0.22, "notes": "test"}
+                {"label": "Llama 3.1 8B on A40", "usd_per_1m_tokens": 0.22, "notes": "test"}
             ],
             "api": [
                 {"label": "GPT-4o", "usd_per_1m_tokens": 6.25, "notes": "test"},

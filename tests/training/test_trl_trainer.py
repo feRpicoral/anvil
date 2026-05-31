@@ -140,7 +140,7 @@ def test_chat_formatting_func_renders_single_example() -> None:
 
     rendered = formatting_func({"messages": [{"role": "user", "content": "hello"}]})
 
-    assert rendered == "user: hello"
+    assert rendered == ["user: hello"]
 
 
 def test_chat_formatting_func_renders_batch() -> None:

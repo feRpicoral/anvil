@@ -15,11 +15,25 @@ import pytest
 
 from anvil.training.qlora import TrainingConfig
 from anvil.training.trl_trainer import (
+    build_chat_formatting_func,
     build_lora_kwargs,
     build_sft_kwargs,
     build_wandb_env,
     load_messages_jsonl,
 )
+
+
+class _Tokenizer:
+    def apply_chat_template(
+        self,
+        conversation: list[dict[str, str]],
+        *,
+        tokenize: bool,
+        add_generation_prompt: bool,
+    ) -> str:
+        assert tokenize is False
+        assert add_generation_prompt is False
+        return "\n".join(f"{m['role']}: {m['content']}" for m in conversation)
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> Path:
@@ -119,6 +133,36 @@ def test_build_lora_kwargs_maps_core_fields() -> None:
     assert kwargs["target_modules"] == ["q_proj", "k_proj", "v_proj"]
     assert kwargs["bias"] == "none"
     assert kwargs["task_type"] == "CAUSAL_LM"
+
+
+def test_chat_formatting_func_renders_single_example() -> None:
+    formatting_func = build_chat_formatting_func(_Tokenizer())
+
+    rendered = formatting_func({"messages": [{"role": "user", "content": "hello"}]})
+
+    assert rendered == "user: hello"
+
+
+def test_chat_formatting_func_renders_batch() -> None:
+    formatting_func = build_chat_formatting_func(_Tokenizer())
+
+    rendered = formatting_func(
+        {
+            "messages": [
+                [{"role": "user", "content": "a"}],
+                [{"role": "assistant", "content": "b"}],
+            ]
+        }
+    )
+
+    assert rendered == ["user: a", "assistant: b"]
+
+
+def test_chat_formatting_func_rejects_missing_messages() -> None:
+    formatting_func = build_chat_formatting_func(_Tokenizer())
+
+    with pytest.raises(ValueError, match="messages"):
+        formatting_func({})
 
 
 def test_build_lora_kwargs_expands_all_linear_to_seven_modules() -> None:

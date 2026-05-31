@@ -19,8 +19,9 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
 from anvil.training.qlora import TrainingConfig, lora_target_module_names
 
@@ -29,6 +30,16 @@ _INSTALL_HINT = (
     "  uv pip install -c constraints/train.txt trl peft transformers accelerate datasets\n"
     "(plus `bitsandbytes` on a CUDA host for NF4/FP4/INT8)."
 )
+
+
+class ChatTemplateTokenizer(Protocol):
+    def apply_chat_template(
+        self,
+        conversation: list[dict[str, str]],
+        *,
+        tokenize: bool,
+        add_generation_prompt: bool,
+    ) -> str: ...
 
 
 def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
@@ -77,6 +88,35 @@ def load_messages_jsonl(path: Path) -> list[dict[str, Any]]:
     if not records:
         raise ValueError(f"{path}: no records found")
     return records
+
+
+def build_chat_formatting_func(
+    tokenizer: ChatTemplateTokenizer,
+) -> Callable[[dict[str, Any]], str | list[str]]:
+    def formatting_func(example: dict[str, Any]) -> str | list[str]:
+        messages = example.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise ValueError("example missing non-empty messages list")
+        if all(isinstance(message, dict) for message in messages):
+            chat_messages = cast(list[dict[str, str]], messages)
+            return tokenizer.apply_chat_template(
+                chat_messages,
+                tokenize=False,
+                add_generation_prompt=False,
+            )
+        if all(isinstance(batch_item, list) for batch_item in messages):
+            batch = cast(list[list[dict[str, str]]], messages)
+            return [
+                tokenizer.apply_chat_template(
+                    batch_messages,
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
+                for batch_messages in batch
+            ]
+        raise ValueError("example messages must be a chat message list")
+
+    return formatting_func
 
 
 def build_lora_kwargs(config: TrainingConfig) -> dict[str, Any]:
@@ -204,6 +244,7 @@ def _train_impl(config: TrainingConfig, resume_from: Path | None) -> int:
         eval_dataset=val_dataset,
         peft_config=lora_config,
         processing_class=tokenizer,
+        formatting_func=build_chat_formatting_func(tokenizer),
     )
     trainer.train(resume_from_checkpoint=str(resume_from) if resume_from is not None else None)
     trainer.save_model(str(config.output_dir / "final"))

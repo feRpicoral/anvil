@@ -18,7 +18,12 @@ from pathlib import Path
 from typing import Any
 
 from anvil.training.qlora import TrainingConfig, lora_target_module_names
-from anvil.training.trl_trainer import apply_wandb_env, build_sft_kwargs, load_messages_jsonl
+from anvil.training.trl_trainer import (
+    apply_wandb_env,
+    build_chat_formatting_func,
+    build_sft_kwargs,
+    load_messages_jsonl,
+)
 
 _INSTALL_HINT = (
     "Unsloth training stack not installed. Run:\n"
@@ -96,6 +101,7 @@ def _train_impl(config: TrainingConfig, resume_from: Path | None) -> int:
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         processing_class=tokenizer,
+        formatting_func=build_chat_formatting_func(tokenizer),
     )
     trainer.train(resume_from_checkpoint=str(resume_from) if resume_from is not None else None)
 

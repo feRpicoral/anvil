@@ -61,6 +61,8 @@ def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
 def ensure_wandb_available(config: TrainingConfig) -> None:
     if not config.wandb_project:
         return
+    if not config.wandb_entity and not os.environ.get("WANDB_ENTITY", "").strip():
+        raise RuntimeError("W&B reporting requires WANDB_ENTITY or wandb_entity")
     try:
         spec = importlib.util.find_spec("wandb")
     except (ImportError, ValueError) as exc:

@@ -180,7 +180,9 @@ def full_run_checks() -> list[CheckResult]:
     import os
 
     checks: list[CheckResult] = []
-    checks.extend(check_env_vars(["OPENAI_API_KEY", "HF_TOKEN", "WANDB_API_KEY"], os.environ))
+    checks.extend(
+        check_env_vars(["OPENAI_API_KEY", "HF_TOKEN", "WANDB_API_KEY", "WANDB_ENTITY"], os.environ)
+    )
     checks.extend(
         check_env_vars(
             ["HF_HOME", "UV_CACHE_DIR", "UV_LINK_MODE", "WANDB_DIR", "TMPDIR"],

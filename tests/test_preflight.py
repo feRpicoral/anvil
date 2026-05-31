@@ -129,6 +129,7 @@ def test_full_run_checks_include_wandb(monkeypatch: pytest.MonkeyPatch) -> None:
         "OPENAI_API_KEY",
         "HF_TOKEN",
         "WANDB_API_KEY",
+        "WANDB_ENTITY",
         "HF_HOME",
         "UV_CACHE_DIR",
         "UV_LINK_MODE",

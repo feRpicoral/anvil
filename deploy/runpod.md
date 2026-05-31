@@ -49,6 +49,7 @@ Plain env vars:
 | `UV_CACHE_DIR` | `/workspace/.cache/uv` |
 | `UV_LINK_MODE` | `copy` |
 | `WANDB_DIR` | `/workspace/wandb` |
+| `WANDB_ENTITY` | `fernandopicoral` |
 | `TMPDIR` | `/workspace/tmp` |
 | `TOKENIZERS_PARALLELISM` | `false` |
 

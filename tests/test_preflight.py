@@ -18,6 +18,7 @@ from anvil.preflight import (
     check_modules_importable,
     check_package_version_below,
     format_report,
+    full_run_checks,
     run_preflight,
 )
 
@@ -119,6 +120,55 @@ def test_check_modules_importable_returns_one_per_name() -> None:
     results = check_modules_importable(["json", "totally_fake"])
 
     assert [r.passed for r in results] == [True, False]
+
+
+def test_full_run_checks_include_wandb(monkeypatch: pytest.MonkeyPatch) -> None:
+    import anvil.preflight as preflight
+
+    for name in [
+        "OPENAI_API_KEY",
+        "HF_TOKEN",
+        "WANDB_API_KEY",
+        "HF_HOME",
+        "UV_CACHE_DIR",
+        "UV_LINK_MODE",
+        "WANDB_DIR",
+        "TMPDIR",
+    ]:
+        monkeypatch.setenv(name, "x")
+
+    seen_modules: list[str] = []
+
+    def fake_modules(names: list[str]) -> list[CheckResult]:
+        seen_modules.extend(names)
+        return [CheckResult(name=f"import:{name}", passed=True, detail="ok") for name in names]
+
+    monkeypatch.setattr(
+        preflight,
+        "check_disk_space",
+        lambda path, min_gb: CheckResult(name="disk", passed=True),
+    )
+    monkeypatch.setattr(preflight, "check_modules_importable", fake_modules)
+    monkeypatch.setattr(
+        preflight,
+        "check_package_version_below",
+        lambda name, upper_major, upper_minor: CheckResult(name=f"version:{name}", passed=True),
+    )
+    monkeypatch.setattr(
+        preflight,
+        "check_cuda_available",
+        lambda: CheckResult(name="cuda", passed=True),
+    )
+    monkeypatch.setattr(
+        preflight,
+        "check_compute_capability",
+        lambda min_major, min_minor: CheckResult(name="compute_capability", passed=True),
+    )
+
+    results = full_run_checks()
+
+    assert "wandb" in seen_modules
+    assert any(result.name == "import:wandb" for result in results)
 
 
 def test_check_package_version_below_passes_for_installed_package() -> None:

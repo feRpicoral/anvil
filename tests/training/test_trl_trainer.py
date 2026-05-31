@@ -19,6 +19,7 @@ from anvil.training.trl_trainer import (
     build_lora_kwargs,
     build_sft_kwargs,
     build_wandb_env,
+    ensure_wandb_available,
     load_messages_jsonl,
 )
 
@@ -283,3 +284,23 @@ def test_build_wandb_env_maps_project_and_entity() -> None:
     env = build_wandb_env(_config(wandb_project="anvil", wandb_entity="feRpicoral"))
 
     assert env == {"WANDB_PROJECT": "anvil", "WANDB_ENTITY": "feRpicoral"}
+
+
+def test_ensure_wandb_available_skips_when_reporting_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "anvil.training.trl_trainer.importlib.util.find_spec",
+        lambda name: pytest.fail("wandb should not be checked"),
+    )
+
+    ensure_wandb_available(_config())
+
+
+def test_ensure_wandb_available_raises_when_reporting_enabled_and_wandb_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("anvil.training.trl_trainer.importlib.util.find_spec", lambda name: None)
+
+    with pytest.raises(ImportError, match="wandb"):
+        ensure_wandb_available(_config(wandb_project="anvil"))

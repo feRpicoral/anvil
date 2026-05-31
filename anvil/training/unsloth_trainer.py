@@ -9,7 +9,7 @@ way the TRL backend does (so `build_sft_kwargs` is shared).
 Linux + CUDA only. Install:
 
     uv pip install -c constraints/train.txt unsloth trl peft transformers \\
-        accelerate datasets bitsandbytes
+        accelerate datasets bitsandbytes wandb
 """
 
 from __future__ import annotations
@@ -22,13 +22,14 @@ from anvil.training.trl_trainer import (
     apply_wandb_env,
     build_chat_formatting_func,
     build_sft_kwargs,
+    ensure_wandb_available,
     load_messages_jsonl,
 )
 
 _INSTALL_HINT = (
     "Unsloth training stack not installed. Run:\n"
     "  uv pip install -c constraints/train.txt unsloth trl peft transformers \\\n"
-    "      accelerate datasets bitsandbytes"
+    "      accelerate datasets bitsandbytes wandb"
 )
 
 
@@ -47,6 +48,7 @@ def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
     except ImportError as exc:
         raise ImportError(_INSTALL_HINT) from exc
 
+    ensure_wandb_available(config)
     return _train_impl(config, resume_from)
 
 

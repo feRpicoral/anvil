@@ -1,22 +1,23 @@
 """TRL-backed QLoRA training driver.
 
 `train(config)` lazy-imports `trl`, `peft`, `transformers`, `datasets`,
-and (for NF4/FP4/INT8 paths) `bitsandbytes` so the module itself stays
-importable on a bare `uv sync` install — those CUDA-coupled deps come
-from `constraints/train.txt`. The pure helpers below run in CI without
-the stack installed and carry the only logic worth unit-testing; the
-trainer invocation is exercised end-to-end by `make train-smoke`.
+`wandb`, and (for NF4/FP4/INT8 paths) `bitsandbytes` so the module itself
+stays importable on a bare `uv sync` install — those CUDA-coupled deps
+come from `constraints/train.txt`. The pure helpers below run in CI
+without the stack installed and carry the only logic worth unit-testing;
+the trainer invocation is exercised end-to-end by `make train-smoke`.
 
 Install the stack with:
 
     uv pip install -c constraints/train.txt trl peft transformers \\
-        accelerate datasets
+        accelerate datasets wandb
 
 …and add `bitsandbytes` on a CUDA host when you want NF4/FP4/INT8.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 from collections.abc import Callable
@@ -27,7 +28,7 @@ from anvil.training.qlora import TrainingConfig, lora_target_module_names
 
 _INSTALL_HINT = (
     "Training stack not installed. Run:\n"
-    "  uv pip install -c constraints/train.txt trl peft transformers accelerate datasets\n"
+    "  uv pip install -c constraints/train.txt trl peft transformers accelerate datasets wandb\n"
     "(plus `bitsandbytes` on a CUDA host for NF4/FP4/INT8)."
 )
 
@@ -53,7 +54,19 @@ def train(config: TrainingConfig, resume_from: Path | None = None) -> int:
     except ImportError as exc:
         raise ImportError(_INSTALL_HINT) from exc
 
+    ensure_wandb_available(config)
     return _train_impl(config, resume_from)
+
+
+def ensure_wandb_available(config: TrainingConfig) -> None:
+    if not config.wandb_project:
+        return
+    try:
+        spec = importlib.util.find_spec("wandb")
+    except (ImportError, ValueError) as exc:
+        raise ImportError(_INSTALL_HINT) from exc
+    if spec is None:
+        raise ImportError(_INSTALL_HINT)
 
 
 def load_messages_jsonl(path: Path) -> list[dict[str, Any]]:

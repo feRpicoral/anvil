@@ -198,6 +198,7 @@ def full_run_checks() -> list[CheckResult]:
                 "datasets",
                 "bitsandbytes",
                 "unsloth",
+                "wandb",
             ]
         )
     )

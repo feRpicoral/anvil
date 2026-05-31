@@ -6,11 +6,11 @@
 #
 #   M1 smoke (no CUDA, no bitsandbytes; LoRA in BF16):
 #     uv pip install -c constraints/train.txt \
-#         trl peft transformers accelerate datasets
+#         trl peft transformers accelerate datasets wandb
 #
 #   Linux + CUDA (paid GPU; full QLoRA stack):
 #     uv pip install -c constraints/train.txt \
-#         unsloth trl peft transformers accelerate datasets bitsandbytes
+#         unsloth trl peft transformers accelerate datasets bitsandbytes wandb
 #
 # Ranges come from the compatibility matrix; refresh after the first
 # successful install on each platform.
@@ -23,3 +23,4 @@ accelerate>=1.0,<2.0
 datasets>=3.0,<4.0
 bitsandbytes>=0.43,<0.50
 unsloth>=2025.0
+wandb>=0.17,<1.0

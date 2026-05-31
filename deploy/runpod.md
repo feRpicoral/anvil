@@ -85,7 +85,7 @@ cd anvil
 
 uv sync --frozen --group dev
 uv pip install -c constraints/train.txt \
-  unsloth trl peft transformers accelerate datasets bitsandbytes
+  unsloth trl peft transformers accelerate datasets bitsandbytes wandb
 ```
 
 Verify the dependency state before spending money:
@@ -100,6 +100,7 @@ import peft
 import torch
 import transformers
 import trl
+import wandb
 
 print("numpy", numpy.__version__)
 print("torch", torch.__version__)
@@ -110,6 +111,7 @@ print("peft", peft.__version__)
 print("datasets", datasets.__version__)
 print("bitsandbytes", bitsandbytes.__version__)
 print("unsloth", getattr(unsloth, "__version__", "installed"))
+print("wandb", wandb.__version__)
 PY
 ```
 

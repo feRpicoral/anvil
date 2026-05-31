@@ -92,18 +92,20 @@ def load_messages_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def build_chat_formatting_func(
     tokenizer: ChatTemplateTokenizer,
-) -> Callable[[dict[str, Any]], str | list[str]]:
-    def formatting_func(example: dict[str, Any]) -> str | list[str]:
+) -> Callable[[dict[str, Any]], list[str]]:
+    def formatting_func(example: dict[str, Any]) -> list[str]:
         messages = example.get("messages")
         if not isinstance(messages, list) or not messages:
             raise ValueError("example missing non-empty messages list")
         if all(isinstance(message, dict) for message in messages):
             chat_messages = cast(list[dict[str, str]], messages)
-            return tokenizer.apply_chat_template(
-                chat_messages,
-                tokenize=False,
-                add_generation_prompt=False,
-            )
+            return [
+                tokenizer.apply_chat_template(
+                    chat_messages,
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
+            ]
         if all(isinstance(batch_item, list) for batch_item in messages):
             batch = cast(list[list[dict[str, str]]], messages)
             return [

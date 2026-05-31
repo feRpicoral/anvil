@@ -57,7 +57,7 @@ if (( FULL == 1 )); then
         echo "[runpod-train] --full needs CONFIRM_PAID=1" >&2
         exit 1
     fi
-    REQUIRED_ENV=(OPENAI_API_KEY HF_TOKEN WANDB_API_KEY)
+    REQUIRED_ENV=(OPENAI_API_KEY HF_TOKEN WANDB_API_KEY WANDB_ENTITY)
     for var in "${REQUIRED_ENV[@]}"; do
         if [[ -z "${!var:-}" ]]; then
             echo "[runpod-train] full run requires \$${var}" >&2

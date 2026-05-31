@@ -300,7 +300,29 @@ def test_ensure_wandb_available_skips_when_reporting_disabled(
 def test_ensure_wandb_available_raises_when_reporting_enabled_and_wandb_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv("WANDB_ENTITY", "feRpicoral")
     monkeypatch.setattr("anvil.training.trl_trainer.importlib.util.find_spec", lambda name: None)
 
     with pytest.raises(ImportError, match="wandb"):
         ensure_wandb_available(_config(wandb_project="anvil"))
+
+
+def test_ensure_wandb_available_raises_when_reporting_enabled_and_entity_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("WANDB_ENTITY", raising=False)
+
+    with pytest.raises(RuntimeError, match="WANDB_ENTITY"):
+        ensure_wandb_available(_config(wandb_project="anvil"))
+
+
+def test_ensure_wandb_available_accepts_entity_from_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("WANDB_ENTITY", raising=False)
+    monkeypatch.setattr(
+        "anvil.training.trl_trainer.importlib.util.find_spec",
+        lambda name: object(),
+    )
+
+    ensure_wandb_available(_config(wandb_project="anvil", wandb_entity="feRpicoral"))

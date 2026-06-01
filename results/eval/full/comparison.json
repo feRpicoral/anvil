@@ -1,0 +1,63 @@
+{
+  "n_cases": 370,
+  "variants": [
+    {
+      "variant": "base",
+      "n_cases": 370,
+      "json_validity_rate": 0.0,
+      "field_scores": {},
+      "total_input_tokens": 335254,
+      "total_output_tokens": 267158,
+      "total_cost_usd": 0.0,
+      "mean_latency_ms": 23844.04146899847
+    },
+    {
+      "variant": "finetuned",
+      "n_cases": 370,
+      "json_validity_rate": 1.0,
+      "field_scores": {
+        "confidentiality": 0.602966537966538,
+        "dispute_forum": 1.0,
+        "dispute_governing_rules": 0.8297297297297297,
+        "dispute_venue": 0.8756756756756757,
+        "effective_date": 1.0,
+        "governing_law": 1.0,
+        "indemnification": 0.8423423423423424,
+        "jurisdiction": 0.9351351351351351,
+        "parties": 0.9963963963963964,
+        "term": 1.0,
+        "termination_cure_period_days": 0.9972972972972973,
+        "termination_notice_days": 0.9135135135135135,
+        "termination_triggers": 0.6921621621621622
+      },
+      "total_input_tokens": 335254,
+      "total_output_tokens": 112582,
+      "total_cost_usd": 0.0,
+      "mean_latency_ms": 13113.946788893962
+    },
+    {
+      "variant": "gpt-4o",
+      "n_cases": 370,
+      "json_validity_rate": 0.9972972972972973,
+      "field_scores": {
+        "confidentiality": 0.5411716207109161,
+        "dispute_forum": 1.0,
+        "dispute_governing_rules": 0.7886178861788617,
+        "dispute_venue": 0.8590785907859079,
+        "effective_date": 0.994579945799458,
+        "governing_law": 0.967479674796748,
+        "indemnification": 0.8337850045167119,
+        "jurisdiction": 0.9322493224932249,
+        "parties": 0.9760614272809395,
+        "term": 1.0,
+        "termination_cure_period_days": 0.997289972899729,
+        "termination_notice_days": 0.8888888888888888,
+        "termination_triggers": 0.6794166989288941
+      },
+      "total_input_tokens": 702869,
+      "total_output_tokens": 93892,
+      "total_cost_usd": 2.6960925,
+      "mean_latency_ms": 2277.7325308453796
+    }
+  ]
+}

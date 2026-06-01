@@ -15,25 +15,20 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
-
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
+from typing import TYPE_CHECKING, Any
 
 from anvil.cost.breakeven import BreakevenPoint
 from anvil.cost.inference_cost import CostComparison, CostScenario
-from anvil.plots.charts import (
-    LossSample,
-    breakeven_curve,
-    cost_per_1m_tokens,
-    json_validity_rate,
-    task_metric_comparison,
-    training_loss_curve,
-)
-from anvil.plots.style import apply_style
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+    from anvil.plots.charts import LossSample
 
 _TRAINING_LOSS_PNG = "training-loss.png"
 _TASK_METRIC_PNG = "task-metric-comparison.png"
@@ -42,7 +37,24 @@ _COST_PER_1M_PNG = "cost-per-1m.png"
 _BREAKEVEN_PNG = "breakeven.png"
 
 
+def _configure_matplotlib() -> None:
+    cache_root = Path(tempfile.gettempdir()) / "anvil-matplotlib"
+    mplconfigdir = cache_root / "mpl"
+    xdg_cache_home = cache_root / "xdg"
+    for cache_dir in (mplconfigdir, xdg_cache_home):
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(mplconfigdir))
+    os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache_home))
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+
+
 def load_loss_history(path: Path) -> list[LossSample]:
+    _configure_matplotlib()
+    from anvil.plots.charts import LossSample
+
     payload = _read_json(path)
     if not isinstance(payload, list):
         raise ValueError(f"{path}: loss history must be a JSON array")
@@ -129,6 +141,8 @@ def load_cost_payload(
 
 
 def save_figure(fig: Figure, path: Path) -> Path:
+    import matplotlib.pyplot as plt
+
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path)
     plt.close(fig)
@@ -136,6 +150,16 @@ def save_figure(fig: Figure, path: Path) -> Path:
 
 
 def run(args: argparse.Namespace) -> int:
+    _configure_matplotlib()
+    from anvil.plots.charts import (
+        breakeven_curve,
+        cost_per_1m_tokens,
+        json_validity_rate,
+        task_metric_comparison,
+        training_loss_curve,
+    )
+    from anvil.plots.style import apply_style
+
     apply_style()
     written: list[Path] = []
     output_dir = args.output_dir

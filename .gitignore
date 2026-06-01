@@ -19,6 +19,11 @@ ENV/
 
 # uv
 .uv/
+.uv-cache/
+
+# Local tool caches
+.cache-local/
+.matplotlib-cache/
 
 # Testing
 .pytest_cache/
@@ -79,11 +84,9 @@ hf_cache/
 results/scratch/
 results/eval/smoke/
 results/train/smoke/
-results/cost/
+results/cost/*
+!results/cost/full.json
 results/charts/
 
 # Local logs (root-anchored)
 /logs/
-
-# Working notes — explicitly NOT in repo per CLAUDE.md
-DECISIONS_WORK.md

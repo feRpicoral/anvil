@@ -49,7 +49,7 @@ Plain env vars:
 | `UV_CACHE_DIR` | `/workspace/.cache/uv` |
 | `UV_LINK_MODE` | `copy` |
 | `WANDB_DIR` | `/workspace/wandb` |
-| `WANDB_ENTITY` | `picoral-anvil` |
+| `WANDB_ENTITY` | `<wandb-team-or-user>` |
 | `TMPDIR` | `/workspace/tmp` |
 | `TOKENIZERS_PARALLELISM` | `false` |
 
@@ -58,12 +58,15 @@ dirs when `/workspace` exists, but pod-level env vars are still the safer path:
 the background training process inherits them, and model/cache downloads do not
 fall back to `/root`.
 
+For W&B, use the entity that owns runs for your account. On organization
+accounts this is usually a team entity, not the organization slug.
+
 ## Local pre-flight
 
 Run this on the Mac before starting the paid pod:
 
 ```bash
-cd /Users/fpicoral/dev/anvil
+cd <repo-root>
 git status --short
 uv sync --frozen --group dev
 make check
@@ -201,7 +204,7 @@ over `ssh.runpod.io`; the proxy can inject banner text and corrupt binary
 streams.
 
 ```bash
-cd /Users/fpicoral/dev/anvil
+cd <repo-root>
 scp -O -P <port> -i ~/.ssh/id_ed25519_runpod \
   root@<ip>:/workspace/anvil-results.tgz \
   anvil-results.tgz
@@ -221,15 +224,16 @@ After the archive is copied and checksums match, stop/delete the pod.
 Back on the Mac:
 
 ```bash
-cd /Users/fpicoral/dev/anvil
+cd <repo-root>
 uv run python -m scripts.cost --config configs/cost-full.toml
 uv run python -m scripts.chart \
   --eval-comparison results/eval/full/comparison.json \
   --cost-report results/cost/full.json \
+  --loss-history results/train/full/loss-history.json \
   --output-dir docs/img
 make check
 ```
 
 Then update the README headline and methodology from the measured artifacts
 before opening the results PR. Do not commit transfer archives, W&B run
-directories, local tokens, or `DECISIONS.md`.
+directories, local tokens, or other local-only working notes.

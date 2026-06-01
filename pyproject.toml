@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Production-grade LLM fine-tuning with LoRA/QLoRA — dataset synthesis, rigorous eval, cost analysis"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-authors = [{ name = "Fernando Picoral", email = "fernandopicoral@gmail.com" }]
+authors = [{ name = "Fernando Picoral", email = "fernando@picoral.me" }]
 license = { text = "MIT" }
 dependencies = [
     "anthropic>=0.40,<1.0",

@@ -1,0 +1,10 @@
+{
+  "variant": "base",
+  "n_cases": 370,
+  "json_validity_rate": 0.0,
+  "field_scores": {},
+  "total_input_tokens": 335254,
+  "total_output_tokens": 267158,
+  "total_cost_usd": 0.0,
+  "mean_latency_ms": 23844.04146899847
+}

@@ -1,0 +1,24 @@
+{
+  "variant": "gpt-4o",
+  "n_cases": 370,
+  "json_validity_rate": 0.9972972972972973,
+  "field_scores": {
+    "confidentiality": 0.5411716207109161,
+    "dispute_forum": 1.0,
+    "dispute_governing_rules": 0.7886178861788617,
+    "dispute_venue": 0.8590785907859079,
+    "effective_date": 0.994579945799458,
+    "governing_law": 0.967479674796748,
+    "indemnification": 0.8337850045167119,
+    "jurisdiction": 0.9322493224932249,
+    "parties": 0.9760614272809395,
+    "term": 1.0,
+    "termination_cure_period_days": 0.997289972899729,
+    "termination_notice_days": 0.8888888888888888,
+    "termination_triggers": 0.6794166989288941
+  },
+  "total_input_tokens": 702869,
+  "total_output_tokens": 93892,
+  "total_cost_usd": 2.6960925,
+  "mean_latency_ms": 2277.7325308453796
+}

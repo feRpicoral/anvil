@@ -1,0 +1,114 @@
+{
+  "training_cost": {
+    "gpu_hours": 4.0,
+    "gpu_hourly_usd": 0.44,
+    "gpu_cost_usd": 1.76,
+    "synthesis_api_cost_usd": 54.0,
+    "eval_api_cost_usd": 2.6960925,
+    "total_usd": 58.4560925
+  },
+  "inference_cost": {
+    "self_hosted": [
+      {
+        "label": "Llama 3.1 8B QLoRA on A40",
+        "usd_per_1m_tokens": 0.1388888888888889,
+        "notes": "RunPod A40 (Community) at 1100 tok/s sustained, 80% utilization."
+      }
+    ],
+    "api": [
+      {
+        "label": "GPT-4o",
+        "usd_per_1m_tokens": 6.25,
+        "notes": "input $2.50/1M, output $10.00/1M, blended at 50% input."
+      },
+      {
+        "label": "Claude Sonnet 4.6",
+        "usd_per_1m_tokens": 9.0,
+        "notes": "input $3.00/1M, output $15.00/1M, blended at 50% input."
+      }
+    ],
+    "input_share": 0.5,
+    "notes": []
+  },
+  "fine_tuned": {
+    "label": "Llama 3.1 8B QLoRA on A40",
+    "gpu_tier_key": "runpod-a40-community",
+    "sustained_throughput_tps": 1100.0,
+    "throughput_source": "Configured A40 serving-throughput assumption for the cost model; not measured during this training run.",
+    "utilization": 0.8,
+    "usd_per_1m_tokens": 0.1388888888888889
+  },
+  "breakeven": {
+    "primary_api_label": "GPT-4o",
+    "primary_api_usd_per_1m": 6.25,
+    "months_horizon": 12,
+    "monthly_volume_m_tokens": 0.7971285340909091,
+    "curve": [
+      {
+        "month": 0,
+        "cumulative_finetuned_usd": 58.4560925,
+        "cumulative_api_usd": 0.0
+      },
+      {
+        "month": 1,
+        "cumulative_finetuned_usd": 58.56680479640151,
+        "cumulative_api_usd": 4.982053338068182
+      },
+      {
+        "month": 2,
+        "cumulative_finetuned_usd": 58.67751709280303,
+        "cumulative_api_usd": 9.964106676136364
+      },
+      {
+        "month": 3,
+        "cumulative_finetuned_usd": 58.788229389204545,
+        "cumulative_api_usd": 14.946160014204546
+      },
+      {
+        "month": 4,
+        "cumulative_finetuned_usd": 58.898941685606054,
+        "cumulative_api_usd": 19.928213352272728
+      },
+      {
+        "month": 5,
+        "cumulative_finetuned_usd": 59.00965398200757,
+        "cumulative_api_usd": 24.91026669034091
+      },
+      {
+        "month": 6,
+        "cumulative_finetuned_usd": 59.12036627840909,
+        "cumulative_api_usd": 29.89232002840909
+      },
+      {
+        "month": 7,
+        "cumulative_finetuned_usd": 59.2310785748106,
+        "cumulative_api_usd": 34.87437336647727
+      },
+      {
+        "month": 8,
+        "cumulative_finetuned_usd": 59.34179087121212,
+        "cumulative_api_usd": 39.856426704545456
+      },
+      {
+        "month": 9,
+        "cumulative_finetuned_usd": 59.452503167613635,
+        "cumulative_api_usd": 44.83848004261364
+      },
+      {
+        "month": 10,
+        "cumulative_finetuned_usd": 59.56321546401515,
+        "cumulative_api_usd": 49.82053338068182
+      },
+      {
+        "month": 11,
+        "cumulative_finetuned_usd": 59.67392776041666,
+        "cumulative_api_usd": 54.80258671875
+      },
+      {
+        "month": 12,
+        "cumulative_finetuned_usd": 59.784640056818176,
+        "cumulative_api_usd": 59.78464005681818
+      }
+    ]
+  }
+}

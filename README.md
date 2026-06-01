@@ -5,12 +5,6 @@
 
 Production-grade LLM fine-tuning with LoRA/QLoRA — dataset synthesis, rigorous eval, cost analysis.
 
-> **Numbers in this README are illustrative pending the paid Llama 3.1 8B QLoRA run.**
-> The pipeline and methodology are real; the JSON validity, F1, and cost figures
-> below come from the M1 smoke pipeline plus a published-source throughput
-> estimate. After the paid run, a single commit will replace them with measured
-> values.
-
 Anvil fine-tunes a small open LLM with QLoRA on a synthesized contract dataset,
 evaluates the result three-way (base / fine-tuned / GPT-4o), publishes the
 adapter on HF Hub, and traces every dollar in the cost comparison back to a
@@ -20,11 +14,12 @@ models efficiently in production.
 
 ## Headline result
 
-A QLoRA-fine-tuned Llama 3.1 8B matches GPT-4o on structured contract
-extraction at ~30× lower inference cost. The fine-tuned model emits
-schema-conformant JSON at near-100% validity; the base model fails on most
-prompts. The training run pays back its one-time cost in **under one month
-of typical extraction volume**.
+A QLoRA-fine-tuned Llama 3.1 8B reached **100% JSON validity** on 370 held-out
+synthetic contracts, while the base model produced 0% valid JSON. It slightly
+exceeded GPT-4o on macro field score (**0.899 vs. 0.881**) and ran at
+**$0.1389 per 1M tokens** under the configured A40 serving assumptions. The
+full run cost **$58.46** and breaks even against GPT-4o at **0.80M tokens per
+month** over a 12-month horizon.
 
 ## The picture
 
@@ -32,11 +27,18 @@ of typical extraction volume**.
 |---|---|
 | ![Per-field comparison](docs/img/task-metric-comparison.png) | ![JSON validity](docs/img/json-validity.png) |
 | ![Cost per 1M tokens](docs/img/cost-per-1m.png) | ![Breakeven curve](docs/img/breakeven.png) |
+| ![Training loss](docs/img/training-loss.png) | |
 
-Training-loss curve is added after the paid run lands. `make chart` regenerates
-local chart outputs under `results/charts/`; refresh the committed README images
-with `uv run python -m scripts.chart --output-dir docs/img` after the source
-JSON files are populated.
+`make chart` regenerates local chart outputs under `results/charts/`. Refresh
+the committed README images with:
+
+```bash
+uv run python -m scripts.chart \
+  --eval-comparison results/eval/full/comparison.json \
+  --cost-report results/cost/full.json \
+  --loss-history results/train/full/loss-history.json \
+  --output-dir docs/img
+```
 
 ## How to read this
 
@@ -46,9 +48,9 @@ JSON files are populated.
 - **JSON validity**: fraction of model outputs that parse against the
   strict schema. This is the gate; F1 means nothing if the output doesn't
   parse.
-- **Cost per 1M tokens**: blended input/output. Self-hosted assumes a
-  published throughput estimate configured in `configs/cost-*.toml`,
-  not a measured number from the paid run.
+- **Cost per 1M tokens**: blended input/output. Self-hosted uses the configured
+  A40 serving-throughput assumption in `configs/cost-*.toml`; serving throughput
+  was not benchmarked during this training run.
 - **Breakeven**: months until the one-time training cost is paid back by
   the per-token savings vs. continuing to call GPT-4o.
 
@@ -103,27 +105,31 @@ clone-install-run snippet. The orchestrator is one command:
 ```
 
 The full pipeline is budget-capped (~$100 envelope: synthesis ≈ $55, training
-≈ $1-5, eval ≈ $20, contingency 25%). Synthesis aborts at the hard cap before
-any training spend is incurred.
+≈ $1-5, eval ≈ $20, contingency 25%). The paid A40 run used 4,000 raw
+synthetic contracts and finished at $58.46 total: $54.00 synthesis, $1.76 GPU,
+and $2.70 GPT-4o eval.
 
 ## Methodology
 
-- **Data**: 4k synthetic NDAs/MSAs/licenses synthesized via GPT-4o with
-  strict JSON-schema enforcement, then curated, stratified, and split into
-  train/val/test. Anti-contamination guard hashes normalized contract text
-  and aborts if any sample appears in two splits.
+- **Data**: 4,000 synthetic NDAs/MSAs/licenses synthesized via GPT-4o with
+  strict JSON-schema enforcement. Curation accepted 3,707 records and rejected
+  293, then split them into 2,966 train, 371 val, and 370 test examples.
+  Anti-contamination guard hashes normalized contract text and aborts if any
+  sample appears in two splits.
 - **Training**: 3 epochs of QLoRA (NF4 + LoRA, rank 16, alpha 32,
   `all_linear` target modules) on Llama 3.1 8B via Unsloth on a single
-  A40. ~2-4 wall-clock hours, roughly $1-2 of GPU time before storage.
+  A40. The paid run completed 558 optimizer steps in 8,259 seconds
+  (about 2h 18m), ending at train loss 0.346 and eval loss 0.328.
 - **Eval**: base, fine-tuned, and GPT-4o predictors run over the same held-out
-  synthetic test split. The report captures JSON validity, field-level scores,
-  token totals, latency, and API cost.
+  370-example synthetic test split. Base validity was 0%, fine-tuned validity
+  was 100%, and GPT-4o validity was 99.73%; macro field score was 0.899 for
+  fine-tuned vs. 0.881 for GPT-4o.
 - **Cost**: training $ = GPU-hours × hourly + synthesis API + eval API.
   Self-hosted inference $ per 1M tokens comes from GPU hourly price,
   sustained throughput, and utilization. Breakeven volume = amortized
-  training / (API per-1M − self-hosted per-1M).
-  Anvil's README keeps the current cost chart illustrative until the paid
-  A40 run replaces the placeholder throughput estimate.
+  training / (API per-1M − self-hosted per-1M). The reported self-hosted
+  inference cost uses the configured A40 serving-throughput assumption, not a
+  measured serving benchmark.
 
 ## Project layout
 
@@ -140,7 +146,7 @@ scripts/       Thin CLIs: synth, curate, split, train, eval, cost, chart, publis
 configs/       TOML configs per pipeline stage (smoke + full variants)
 constraints/   CUDA-coupled pin sets installed out-of-band
 deploy/        RunPod orchestrator + operator docs
-results/       Eval comparison, cost reports (gitignored beyond illustrative)
+results/       Eval comparison, cost reports, and committed full-run summaries
 ```
 
 ## CI
